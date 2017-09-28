@@ -61,25 +61,25 @@ namespace CompilerBenchmarker
 
 	static class Benchmarker
 	{
-		static TimeSpan? RunBenchmark(Compiler compiler, string codeFilePath)
+		static TimeSpan? RunBenchmark(Compiler compiler, string codeFilePath, int numFun)
 		{
 			var watch = new Stopwatch();
 			watch.Start();
-			var args = string.Join(" ", new[] { codeFilePath }.Concat(compiler.Arguments));
-			Console.WriteLine($"- Running: {compiler.Exe} {args}");
+			var args = string.Join(" ", compiler.Arguments.Concat(new[] { codeFilePath }));
+			Console.WriteLine($"  - Running with {numFun}: {compiler.Exe} {args}");
 			var p = Process.Start(compiler.Exe, args);
 			p.WaitForExit(); // todo: pass in compiler timeout option
 			if (p.ExitCode != 0)
 			{
 				// todo: pass in stop on failure option
 				watch.Stop();
-				Console.WriteLine($"! Compilation failed!");
+				Console.WriteLine($"  ! Compilation failed!");
 				throw new CompilationFailed($"Compilation failed for '{compiler.Exe} {args}'");
 				// return null;
 			}
 
 			watch.Stop();
-			Console.WriteLine($"- Took {watch.Elapsed}");
+			Console.WriteLine($"  - Took {watch.Elapsed}");
 			Console.WriteLine();
 			return watch.Elapsed;
 		}
@@ -89,19 +89,18 @@ namespace CompilerBenchmarker
 		{
 			foreach (var langCompilers in compilers.GroupBy(x => x.Language))
 			{
-
+				Console.WriteLine($"Benchmarking {langCompilers.Key}:");
 				for (int numFun = numberAtStart, step = 1;
 					step <= numberOfSteps;
 					step += 1, numFun += increaseOnStep)
 				{
 					// generate file
-					Console.WriteLine($"Generating code for {langCompilers.Key} with {numFun} functions..");
-					var codeFilePath = new CodeGen().WriteLang(langCompilers.Key, numberAtStart, numFun);
+					Console.WriteLine($"- Generating {langCompilers.Key} with {numFun} functions..");
+					var codeFilePath = new CodeGen().WriteLang(langCompilers.Key, numFun);
 					foreach (var compiler in langCompilers)
 					{
 						// run benchmark
-						Console.WriteLine($"- Running benchmark for {langCompilers.Key} with {numFun} functions..");
-						var time = RunBenchmark(compiler, codeFilePath);
+						var time = RunBenchmark(compiler, codeFilePath, numFun);
 						if (time.HasValue)
 							yield return new CompilerBenchmark(compiler, time.Value, numFun);
 					}
@@ -113,24 +112,51 @@ namespace CompilerBenchmarker
 
 		static void WriteResults(IEnumerable<CompilerBenchmark> times, string resultFileName)
 		{
-			Console.WriteLine("Writing results..");
-			var header = "Compiler,Options,NumberFunctions,Time";
-			var rows = times.Select(x => string.Join(",", new[] {
-				x.Compiler.Exe,
-				string.Join(" ", x.Compiler.Arguments),
-				x.NumberFunctions.ToString(),
-				x.TimeToCompile.TotalSeconds.ToString()
-			}));
+			// todo: add args, this assumes one Exe per compiler
+			// also makes other assumptions that could be improved,
+			// like assuming each list is the same size
 
-			File.WriteAllText(resultFileName, header + "\n" + string.Join("\n", rows));
+			var columns = new Dictionary<string, List<string>>
+			{
+				["n"] = times.Select(x => x.NumberFunctions).Distinct().Select(x => x.ToString()).ToList()
+			};
+			foreach (var time in times)
+			{
+				var exe = time.Compiler.Exe;
+				if (columns.ContainsKey(exe))
+				{
+					columns[exe].Add(time.TimeToCompile.TotalSeconds.ToString());
+				}
+				else
+				{
+					columns[exe] = new List<string> { time.TimeToCompile.TotalSeconds.ToString() };
+				}
+			}
+
+			// write results
+			var num = columns.First().Value.Count;
+			var keys = columns.Keys.ToList();
+			var rows = new List<string> { string.Join(",", keys) };
+			for (var i = 0; i < num; i++)
+			{
+				var cells = new List<string>(keys.Count);
+				foreach (var key in columns.Keys)
+				{
+					cells.Add(columns[key][i]);
+				}
+				rows.Add(string.Join(",", cells));
+			}
+
+			Console.WriteLine("Writing results..");
+			File.WriteAllText(resultFileName, string.Join("\n", rows));
 			Console.WriteLine($"Wrote results to {resultFileName}");
 		}
 
 		static void Main(string[] args)
 		{
-			int numberAtStart = 1;
-			int numberOfSteps = 1;
-			int stepIncreaseNumber = 10;
+			int numberAtStart = 100;
+			int numberOfSteps = 3;
+			int stepIncreaseNumber = 100;
 
 			// todo: good command-line options library for C#?
 			var helpInfo = new Dictionary<string, int>
@@ -148,23 +174,23 @@ namespace CompilerBenchmarker
 			var compilers = new List<Compiler>
 			{
 				// native section
-				// new Compiler("C", "c", "gcc", "-O2"),
+				new Compiler("C", "c", "gcc", "-O2"),
 				// new Compiler("C++", "cpp", "g++", "-O2"),
 				// new Compiler("C++", "cpp", "clang", "-O2"),
 				// new Compiler("Go", "go", "go", "build"),
-				// new Compiler("Rust", "rs", "rustc", "opt-level=2"),
+				// new Compiler("Rust", "rs", "rustc", "-C", "opt-level=2"),
 				new Compiler("D", "d", "dmd", "-O"),
 				new Compiler("D", "d", "gdc", "-O"),
-				new Compiler("D", "d", "ldc2", "-O"),
-				new Compiler("Haskell", "hs", "ghc"), // optimize?
-				new Compiler("OCaml", "ml", "ocamlopt"), // optimize?
+				// new Compiler("D", "d", "ldc2", "-O"),
+				// new Compiler("Haskell", "hs", "ghc"), // optimize?
+				// new Compiler("OCaml", "ml", "ocamlopt"), // optimize?
 
 				// VM section
-				new Compiler("CSharp", "cs", "csc"),
-				new Compiler("FSharp", "fs", "fsharpc"),
+				// new Compiler("CSharp", "cs", "csc"),
+				// new Compiler("FSharp", "fs", "fsharpc"),
 				// new Compiler("java", "java", "javac"), // todo: generate java
 				// new Compiler("scala", "scala", "scalac") // todo: generate scala
-				new Compiler("Kotlin", "kt", "kotlinc"),
+				// new Compiler("Kotlin", "kt", "kotlinc"),
 			};
 
 			try
@@ -173,7 +199,7 @@ namespace CompilerBenchmarker
 				if (!Directory.Exists(write_to))
                 	Directory.CreateDirectory(write_to);
             	Directory.SetCurrentDirectory(write_to);
-				var benchmarks = RunBenchmarks(compilers, numberAtStart, numberOfSteps, stepIncreaseNumber);
+				var benchmarks = RunBenchmarks(compilers, numberAtStart, numberOfSteps, stepIncreaseNumber).ToList();
 
 				// todo: write results to CSV, with system data (OS, Kernel, CPU, Mem, HD?)
 				// should we track memory consumption as well?

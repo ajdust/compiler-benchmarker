@@ -485,7 +485,7 @@ namespace CompilerBenchmarker
             else if (expr is VarExpr)
                 write_var_expr(f, expr as VarExpr, needs_parens);
             else if (expr is BinOp)
-                write_bin_op(f, expr as BinOp, needs_parens);
+                write_bin_op(f, expr as BinOp, true);
             else if (expr is FunCallExpr)
                 write_fun_call(f, expr as FunCallExpr, needs_parens);
             else
@@ -1548,10 +1548,10 @@ namespace CompilerBenchmarker
             }
         }
 
-        public string WriteLang(string lang, int seed, int num_funs)
+        public string WriteLang(string lang, int num_funs)
         {
             var langwriter = GetLang(lang);
-            var filename = $"test_{seed}_{num_funs}.{langwriter.ext}";
+            var filename = $"test_{num_funs}.{langwriter.ext}";
             File.Delete(filename);
             using (var f = new StreamWriter(filename))
             {
