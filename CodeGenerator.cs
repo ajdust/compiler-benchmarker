@@ -545,7 +545,7 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(program));
 
             f.write("#include <cstdio>\n\n");
-            foreach (var  fun_decl in program.functions)
+            foreach (var fun_decl in program.functions)
                 write_fun_decl(f, fun_decl);
                 f.write("\n");
             write_fun_decl(f, program.main, true);
@@ -631,7 +631,7 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(program));
 
             f.write("#include <stdio.h>\n\n");
-            foreach (var  fun_decl in program.functions)
+            foreach (var fun_decl in program.functions)
             {
                 write_fun_decl(f, fun_decl);
                 f.write("\n");
@@ -654,7 +654,7 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(program));
 
             f.write("import std.stdio;\n\n");
-            foreach (var  fun_decl in program.functions)
+            foreach (var fun_decl in program.functions)
                 write_fun_decl(f, fun_decl);
                 f.write("\n");
             write_fun_decl(f, program.main, true);
@@ -842,7 +842,7 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(program));
 
             f.write("program main;\n\n");
-            foreach (var  fun_decl in program.functions)
+            foreach (var fun_decl in program.functions)
             {
                 write_fun_decl(f, fun_decl);
                 f.write("\n");
@@ -942,7 +942,8 @@ namespace CompilerBenchmarker
             if (program == null)
                 throw new ArgumentNullException(nameof(program));
 
-            foreach (var  fun_decl in program.functions)
+            f.write("#![allow(unused_parens)]\n\n");
+            foreach (var fun_decl in program.functions)
             {
                 write_fun_decl(f, fun_decl);
                 f.write("\n");
@@ -987,11 +988,6 @@ namespace CompilerBenchmarker
             f.write(" = ");
             write_expr(f, var_decl.expr);
             f.write(";\n");
-    	}
-
-        public override void write_const_expr(Writer f, ConstExpr expr, bool needs_parens)
-        {
-            f.write(expr.val + "i32");
     	}
 
         public override void write_assignment(Writer f, Assignment assignment)
@@ -1047,7 +1043,7 @@ namespace CompilerBenchmarker
             if (program == null)
                 throw new ArgumentNullException(nameof(program));
 
-            foreach (var  fun_decl in program.functions)
+            foreach (var fun_decl in program.functions)
             {
                 write_fun_decl(f, fun_decl);
                 f.write("\n");
@@ -1145,7 +1141,7 @@ namespace CompilerBenchmarker
             if (program == null)
                 throw new ArgumentNullException(nameof(program));
 
-            foreach (var  fun_decl in program.functions)
+            foreach (var fun_decl in program.functions)
             {
                 write_fun_decl(f, fun_decl);
                 f.write("\n");
@@ -1361,7 +1357,7 @@ namespace CompilerBenchmarker
     	    write_indent(f);
             f.write("{\n");
             indent += 1;
-            foreach (var  fun_decl in program.functions)
+            foreach (var fun_decl in program.functions)
             {
                 write_fun_decl(f, fun_decl);
                 f.write("\n");
@@ -1418,6 +1414,45 @@ namespace CompilerBenchmarker
         }
     }
 
+    class JavaLang : CSharpLang
+    {
+        public override string ext => "java";
+
+        public override void write_program(Writer f, Program program)
+        {
+            if (program == null)
+                throw new ArgumentNullException(nameof(program));
+
+            f.write("package CompilationSpeedTest;\n\n");
+            write_indent(f);
+            f.write("class Program\n");
+            write_indent(f);
+            f.write("{\n");
+            indent += 1;
+            foreach (var fun_decl in program.functions)
+            {
+                write_fun_decl(f, fun_decl);
+                f.write("\n");
+            }
+            write_fun_decl(f, program.main, true);
+            f.write("\n");
+            indent -= 1;
+            write_indent(f);
+            f.write("}\n");
+        }
+
+        public override void write_print(Writer f, Print statement)
+        {
+            if (statement == null)
+                throw new ArgumentNullException(nameof(statement));
+
+            write_indent(f);
+            f.write("System.out.format(\"%d\\n\", ");
+            write_expr(f, statement.expr);
+            f.write(");\n");
+        }
+    }
+
     class KotlinLang : Lang
     {
         public override string ext => "kt";
@@ -1437,7 +1472,7 @@ namespace CompilerBenchmarker
             if (program == null)
                 throw new ArgumentNullException(nameof(program));
 
-            foreach (var  fun_decl in program.functions)
+            foreach (var fun_decl in program.functions)
             {
                 write_fun_decl(f, fun_decl);
                 f.write("\n");
@@ -1524,6 +1559,60 @@ namespace CompilerBenchmarker
         }
     }
 
+    class ScalaLang : KotlinLang
+    {
+        public override string ext => "scala";
+
+        public override Dictionary<string, string> operators => new Dictionary<string, string> {
+            ["&"] = "&",
+            ["|"] = "|",
+            ["^"] = "^"
+        };
+
+        public override void write_program(Writer f, Program program)
+        {
+            if (program == null)
+                throw new ArgumentNullException(nameof(program));
+
+            f.write("object CompilerBenchmarker {\n");
+            write_indent(f);
+            f.write("\n");
+            indent += 1;
+            foreach (var fun_decl in program.functions)
+            {
+                write_indent(f);
+                write_fun_decl(f, fun_decl);
+                f.write("\n");
+            }
+            write_fun_decl(f, program.main, true);
+            indent -= 1;
+            f.write("}");
+        }
+
+        public override void write_fun_decl(Writer f, FunDecl fun_decl, bool main=false)
+        {
+            if (fun_decl == null)
+                throw new ArgumentNullException(nameof(fun_decl));
+
+            string optional_result, type_name;
+            if (fun_decl.return_type == "")
+                optional_result = "";
+            else
+            {
+                type_names.TryGetValue(fun_decl.return_type, out type_name);
+                optional_result = ": " + type_name;
+            }
+            var fun_name = main ? "main" : fun_decl.name;
+            f.write($"def {fun_name}(){optional_result} = {{\n");
+            indent += 1;
+            foreach (var statement in fun_decl.statements)
+                write_statement(f, statement);
+            indent -= 1;
+            f.write("}\n");
+        }
+    }
+
+
     //----------------------------------------------------------
 
     public class CodeGen
@@ -1543,16 +1632,21 @@ namespace CompilerBenchmarker
                 case "csharp": return new CSharpLang();
                 case "haskell": return new HaskellLang();
                 case "kotlin": return new KotlinLang();
+                case "java": return new JavaLang();
+                case "scala": return new ScalaLang();
                 default:
                     throw new ArgumentOutOfRangeException(nameof(lang), $"{lang} is not supported by the code generation. So code it for us all to enjoy!");
             }
         }
 
-        public string WriteLang(string lang, int num_funs)
+        public void WriteLang(string lang, int num_funs, string filename)
         {
             var langwriter = GetLang(lang);
-            var filename = $"test_{num_funs}.{langwriter.ext}";
-            File.Delete(filename);
+            if (File.Exists(filename))
+                File.Delete(filename);
+
+            // todo: rename to be C# standard style naming
+            // todo: write language files identically
             using (var f = new StreamWriter(filename))
             {
                 langwriter.write_program(
@@ -1560,8 +1654,6 @@ namespace CompilerBenchmarker
                     new Context().random_program(
                         num_funs: num_funs, max_statements_per_fun: 20));
             }
-
-            return filename;
         }
     }
 }
