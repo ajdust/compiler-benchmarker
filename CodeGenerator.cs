@@ -6,39 +6,18 @@ using System.Collections.Generic;
 
 namespace CompilerBenchmarker
 {
-    public class Writer
+    public static class RandomExtensions
     {
-        private StreamWriter s;
-
-        public Writer(StreamWriter s)
-        {
-            this.s = s;
-        }
-
-    	public void write(string text)
-        {
-            s.Write(text);
-        }
-    }
-
-    public static class random
-    {
-    	public static int randint(int a, int b)
+    	public static T Choice<T>(this Random r, IList<T> of)
     	{
-    		return new Random().Next(a, b);
-    	}
-
-    	public static T choice<T>(IList<T> of)
-    	{
-    		return of[new Random().Next(0, of.Count)];
+    		return of[r.Next(0, of.Count)];
     	}
     }
-
 
     public interface IHasUsed
     {
-        bool used { get; set; }
-        string name { get; set; }
+        bool used {get;set;}
+        string name {get;set;}
     }
 
     abstract class Expr
@@ -167,20 +146,20 @@ namespace CompilerBenchmarker
     {
     	public string name {get;set;}
     	public IList<Statement> statements {get;set;}
-    	public string return_type {get;set;}
+    	public string returnType {get;set;}
         public bool used {get;set;}
-    	public FunDecl(string name, IList<Statement> statements, string return_type)
+    	public FunDecl(string name, IList<Statement> statements, string returnType)
     	{
             if (name == null)
                 throw new ArgumentNullException(nameof(name));
             if (statements == null)
                 throw new ArgumentNullException(nameof(statements));
-            if (return_type == null)
-                throw new ArgumentNullException(nameof(return_type));
+            if (returnType == null)
+                throw new ArgumentNullException(nameof(returnType));
 
             this.name = name;
             this.statements = statements;
-            this.return_type = return_type;
+            this.returnType = returnType;
             this.used = false;
         }
     }
@@ -206,44 +185,47 @@ namespace CompilerBenchmarker
     	public Dictionary<string, IHasUsed> env {get;set;} = new Dictionary<string, IHasUsed>();
     	public int id {get;set;} = 0;
     	public Context parent {get;set;}
-    	public string decl_name {get;set;}
-    	public Context(Context parent=null, string decl_name=null)
+    	public string declName {get;set;}
+        public Random random {get;set;}
+
+    	public Context(Context parent = null, string declName = null)
     	{
             this.parent = parent;
-            this.decl_name = decl_name;
+            this.declName = declName;
+            this.random = new Random();
     	}
 
-        public string name(string _base, int i)
+        public string name(string prefix, int i)
         {
-            return $"{_base}{i}";
+            return $"{prefix}{i}";
     	}
 
-        public string new_name(string _base)
+        public string newName(string prefix)
         {
             id += 1;
-            return name(_base, id);
+            return name(prefix, id);
     	}
 
-        public string random_name(string _base)
+        public string randomName(string prefix)
         {
-            var biased_min = random.randint(1, id);
-            var i = random.randint(biased_min, id);
-            return name(_base, i);
+            var biasedMin = random.Next(1, id);
+            var i = random.Next(biasedMin, id);
+            return name(prefix, i);
     	}
 
-        public Expr random_expr()
+        public Expr randomExpr()
         {
-        	switch (random.randint(1, 5))
+        	switch (random.Next(1, 5))
         	{
-                case 1: return random_const_expr();
-                case 2: return random_var_expr();
-                case 3: return random_binary_op();
-                case 4: return random_fun_call();
+                case 1: return randomConstExpr();
+                case 2: return randomVarExpr();
+                case 3: return randomBinaryOp();
+                case 4: return randomFunCall();
                 default: throw new ArgumentOutOfRangeException();
             };
     	}
 
-        public IHasUsed find_unused()
+        public IHasUsed findUnused()
         {
             foreach (var decl in env)
             {
@@ -253,95 +235,95 @@ namespace CompilerBenchmarker
             return null;
     	}
 
-        public Expr force_use_expr()
+        public Expr forceUseExpr()
         {
-            Expr expr = random_const_expr();
-            var decl = find_unused();
+            Expr expr = randomConstExpr();
+            var decl = findUnused();
             while (decl != null)
             {
-                var left = forced_var_expr(decl.name);
-                expr = forced_random_binary_op(left, expr);
-                decl = find_unused();
+                var left = forcedVarExpr(decl.name);
+                expr = forcedRandomBinaryOp(left, expr);
+                decl = findUnused();
             }
 
-            decl = parent.find_unused();
+            decl = parent.findUnused();
             while (decl != null)
             {
-                var left = forced_fun_call(decl.name);
-                expr = forced_random_binary_op(left, expr);
-                decl = parent.find_unused();
+                var left = forcedFunCall(decl.name);
+                expr = forcedRandomBinaryOp(left, expr);
+                decl = parent.findUnused();
             }
             return expr;
     	}
 
-        public ConstExpr random_const_expr()
+        public ConstExpr randomConstExpr()
         {
-            return new ConstExpr(random.randint(1, 1000).ToString());
+            return new ConstExpr(random.Next(1, 1000).ToString());
     	}
 
-        public VarExpr forced_var_expr(string name)
+        public VarExpr forcedVarExpr(string name)
         {
             var decl = env[name];
             decl.used = true;
             return new VarExpr(name);
     	}
 
-        public Expr random_var_expr()
+        public Expr randomVarExpr()
         {
             if (id == 0)
-                return random_const_expr();
-            var name = random_name("x");
-            return forced_var_expr(name);
+                return randomConstExpr();
+            var name = randomName("x");
+            return forcedVarExpr(name);
     	}
 
-        public BinOp forced_random_binary_op(Expr left, Expr right)
+        public BinOp forcedRandomBinaryOp(Expr left, Expr right)
         {
             //op = random.choice(["+", "-", "*", "|", "&", "^"]);
-            var op = random.choice(new[] {"|", "&", "^"});
+            var op = random.Choice(new[] {"|", "&", "^"});
             return new BinOp(op, left, right);
     	}
 
-        public BinOp random_binary_op()
+        public BinOp randomBinaryOp()
         {
-            var left = random_expr();
-            var right = random_expr();
-            return forced_random_binary_op(left, right);
+            var left = randomExpr();
+            var right = randomExpr();
+            return forcedRandomBinaryOp(left, right);
     	}
 
-        public FunCallExpr forced_fun_call(string name)
+        public FunCallExpr forcedFunCall(string name)
         {
             var decl = parent.env[name];
             decl.used = true;
             return new FunCallExpr(name);
     	}
 
-        public Expr random_fun_call()
+        public Expr randomFunCall()
         {
             if (parent.id == 0)
-                return random_const_expr();
-            var name = parent.random_name("f");
-            return forced_fun_call(name);
+                return randomConstExpr();
+            var name = parent.randomName("f");
+            return forcedFunCall(name);
     	}
 
-        public Statement random_statement()
+        public Statement randomStatement()
         {
-        	switch (random.randint(1, 3))
+        	switch (random.Next(1, 3))
         	{
-                case 1: return random_assignment();
-                case 2: return random_var_decl();
+                case 1: return randomAssignment();
+                case 2: return randomVarDecl();
                 default: throw new ArgumentOutOfRangeException();
         	}
     	}
 
-        public Assignment random_assignment()
+        public Assignment randomAssignment()
         {
-            var name = random_name("x");
+            var name = randomName("x");
             var decl = env[name];
-            var expr = random_expr();
+            var expr = randomExpr();
             if (!decl.used)
             {
-                var left = forced_var_expr(name);
-                expr = forced_random_binary_op(left, expr);
+                var left = forcedVarExpr(name);
+                expr = forcedRandomBinaryOp(left, expr);
             }
             decl.used = false;
             if (decl is VarDecl)
@@ -349,956 +331,943 @@ namespace CompilerBenchmarker
             return new Assignment(name, expr);
     	}
 
-        public Return random_return_statement()
+        public Return randomReturnStatement()
         {
-            return new Return(force_use_expr());
+            return new Return(forceUseExpr());
     	}
 
-        public Print random_print_statement()
+        public Print randomPrintStatement()
         {
-            return new Print(force_use_expr());
+            return new Print(forceUseExpr());
     	}
 
-        public VarDecl random_var_decl()
+        public VarDecl randomVarDecl()
         {
-            var expr = random_expr();
-            var name = new_name("x");
+            var expr = randomExpr();
+            var name = newName("x");
             var decl = new VarDecl(name, expr);
             env[name] = decl;
             return decl;
     	}
 
-        public FunDecl random_fun_decl(int num_statements, string return_type)
+        public FunDecl randomFunDecl(int numStatements, string returnType)
         {
             var local = new Context(this);
             var statements = new List<Statement>();
-            statements.Add(local.random_var_decl());
-            foreach (var i in Enumerable.Range(0, num_statements))
-                statements.Add(local.random_statement());
-            if (return_type != "")
-                statements.Add(local.random_return_statement());
+            statements.Add(local.randomVarDecl());
+            foreach (var i in Enumerable.Range(0, numStatements))
+                statements.Add(local.randomStatement());
+            if (returnType != "")
+                statements.Add(local.randomReturnStatement());
             else
-                statements.Add(local.random_print_statement());
-            var name = new_name("f");
-            var decl = new FunDecl(name, statements, return_type);
+                statements.Add(local.randomPrintStatement());
+            var name = newName("f");
+            var decl = new FunDecl(name, statements, returnType);
             // local.decl = decl;
             env[name] = decl;
             return decl;
     	}
 
-        public Program random_program(int num_funs, int max_statements_per_fun)
+        public Program randomProgram(int numFuns, int maxStatementsPerFun)
         {
             var functions = new List<FunDecl>();
-            int num_statements;
-            foreach (var i in Enumerable.Range(0, num_funs))
+            int numStatements;
+            foreach (var i in Enumerable.Range(0, numFuns))
             {
-                num_statements = random.randint(1, max_statements_per_fun);
-                var fun_decl = random_fun_decl(num_statements, "int");
-                functions.Add(fun_decl);
+                numStatements = random.Next(1, maxStatementsPerFun);
+                var funDecl = randomFunDecl(numStatements, "int");
+                functions.Add(funDecl);
             }
-            num_statements = random.randint(1, max_statements_per_fun);
-            var main = random_fun_decl(num_statements, "");
+            numStatements = random.Next(1, maxStatementsPerFun);
+            var main = randomFunDecl(numStatements, "");
             return new Program(main, functions);
         }
     }
 
-    class Lang
+    abstract class Lang
     {
-        public virtual string ext { get; }
+        protected virtual string ext {get;}
     	public int indent {get;set;} = 0;
-    	public int extra_indent {get;set;} = 0;
+    	public int extraIndent {get;set;} = 0;
 
-        public virtual Dictionary<string, string> operators => new Dictionary<string,string> {
+        protected virtual Dictionary<string, string> operators => new Dictionary<string, string> {
             {"&", "&"},
             {"|", "|"},
             {"^", "^"}
         };
 
-        public virtual void write_indent(Writer f)
+        protected virtual void writeIndent(StreamWriter f)
         {
-            var num = 4 * indent + extra_indent;
+            var num = 4 * indent + extraIndent;
             string s = "";
             for (; num > 0; num--)
             {
                 s += " ";
             }
-            f.write(s);
+            f.Write(s);
     	}
 
-        public virtual void write_fun_decl(Writer f, FunDecl s, bool main=false)
-        {
-            throw new NotImplementedException();
-        }
-        public virtual void write_var_decl(Writer f, VarDecl s)
-        {
-            throw new NotImplementedException();
-        }
-        public virtual void write_assignment(Writer f, Assignment s)
-        {
-            throw new NotImplementedException();
-        }
-        public virtual void write_return(Writer f, Return s)
-        {
-            throw new NotImplementedException();
-        }
-        public virtual void write_print(Writer f, Print s)
-        {
-            throw new NotImplementedException();
-        }
-        public virtual void write_program(Writer f, Program s)
-        {
-            throw new NotImplementedException();
-        }
+        abstract protected void writeFunDecl(StreamWriter f, FunDecl s, bool main = false);
 
-        public virtual void write_statement(Writer f, Statement statement)
+        abstract protected void writeVarDecl(StreamWriter f, VarDecl s);
+
+        abstract protected void writeAssignment(StreamWriter f, Assignment s);
+
+        abstract protected void writeReturn(StreamWriter f, Return s);
+
+        abstract protected void writePrint(StreamWriter f, Print s);
+
+        abstract public void WriteProgram(StreamWriter f, Program s);
+
+        protected virtual void writeStatement(StreamWriter f, Statement statement)
         {
             if (statement == null)
                 throw new ArgumentNullException(nameof(statement));
 
             if (statement is VarDecl)
-                write_var_decl(f, statement as VarDecl);
+                writeVarDecl(f, statement as VarDecl);
             else if (statement is Assignment)
-                write_assignment(f, statement as Assignment);
+                writeAssignment(f, statement as Assignment);
             else if (statement is Return)
-                write_return(f, statement as Return);
+                writeReturn(f, statement as Return);
             else if (statement is Print)
-                write_print(f, statement as Print);
+                writePrint(f, statement as Print);
             else
                 throw new Exception("Unknown kind of statement");
     	}
 
-        public virtual void write_lval(Writer f, string lval)
+        protected virtual void writeLval(StreamWriter f, string lval)
         {
             if (lval == null)
                 throw new ArgumentNullException(nameof(lval));
 
-            f.write(lval);
+            f.Write(lval);
     	}
 
-        public virtual void write_expr(Writer f, Expr expr, bool needs_parens=false)
+        protected virtual void writeExpr(StreamWriter f, Expr expr, bool needsParens = false)
         {
             if (expr == null)
                 throw new ArgumentNullException(nameof(expr));
 
             if (expr is ConstExpr)
-                write_const_expr(f, expr as ConstExpr, needs_parens);
+                writeConstExpr(f, expr as ConstExpr, needsParens);
             else if (expr is VarExpr)
-                write_var_expr(f, expr as VarExpr, needs_parens);
+                writeVarExpr(f, expr as VarExpr, needsParens);
             else if (expr is BinOp)
-                write_bin_op(f, expr as BinOp, true);
+                writeBinOp(f, expr as BinOp, true);
             else if (expr is FunCallExpr)
-                write_fun_call(f, expr as FunCallExpr, needs_parens);
+                writeFunCall(f, expr as FunCallExpr, needsParens);
             else
                 throw new Exception("Unknown kind of expr");
     	}
 
-        public virtual void write_const_expr(Writer f, ConstExpr expr, bool needs_parens)
+        protected virtual void writeConstExpr(StreamWriter f, ConstExpr expr, bool needsParens)
         {
             if (expr == null)
                 throw new ArgumentNullException(nameof(expr));
 
-            f.write(expr.val);
+            f.Write(expr.val);
     	}
 
-        public virtual void write_var_expr(Writer f, VarExpr expr, bool needs_parens)
+        protected virtual void writeVarExpr(StreamWriter f, VarExpr expr, bool needsParens)
         {
             if (expr == null)
                 throw new ArgumentNullException(nameof(expr));
 
-            f.write(expr.name);
+            f.Write(expr.name);
     	}
 
-        public virtual void write_bin_op(Writer f, BinOp expr, bool needs_parens)
+        protected virtual void writeBinOp(StreamWriter f, BinOp expr, bool needsParens)
         {
             if (expr == null)
                 throw new ArgumentNullException(nameof(expr));
 
-            if (needs_parens)
-                f.write("(");
-            write_expr(f, expr.left, needs_parens);
-            f.write($" {operators[expr.op]} ");
-            write_expr(f, expr.right, needs_parens);
-            if (needs_parens)
-                f.write(")");
+            if (needsParens)
+                f.Write("(");
+            writeExpr(f, expr.left, needsParens);
+            f.Write($" {operators[expr.op]} ");
+            writeExpr(f, expr.right, needsParens);
+            if (needsParens)
+                f.Write(")");
     	}
 
-        public virtual void write_fun_call(Writer f, FunCallExpr expr, bool needs_parens)
+        protected virtual void writeFunCall(StreamWriter f, FunCallExpr expr, bool needsParens)
         {
             if (expr == null)
                 throw new ArgumentNullException(nameof(expr));
 
-            f.write($"{expr.name}()");
+            f.Write($"{expr.name}()");
         }
     }
 
     class CppLang : Lang
     {
-        public override string ext => "cpp";
+        protected override string ext => "cpp";
 
-        public Dictionary<string, string> type_names => new Dictionary<string, string> {
+        public Dictionary<string, string> typeNames => new Dictionary<string, string> {
             ["int"] = "int"
         };
 
-        public override void write_program(Writer f, Program program)
+        public override void WriteProgram(StreamWriter f, Program program)
         {
             if (program == null)
                 throw new ArgumentNullException(nameof(program));
 
-            f.write("#include <cstdio>\n\n");
-            foreach (var fun_decl in program.functions)
-                write_fun_decl(f, fun_decl);
-                f.write("\n");
-            write_fun_decl(f, program.main, true);
+            f.Write("#include <cstdio>\n\n");
+            foreach (var funDecl in program.functions)
+                writeFunDecl(f, funDecl);
+                f.Write("\n");
+            writeFunDecl(f, program.main, true);
     	}
 
-        public override void write_fun_decl(Writer f, FunDecl fun_decl, bool main=false)
+        protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
-            if (fun_decl == null)
-                throw new ArgumentNullException(nameof(fun_decl));
+            if (funDecl == null)
+                throw new ArgumentNullException(nameof(funDecl));
 
-            string optional_result, type_name;
-            if (fun_decl.return_type == "")
-                optional_result = "int ";
+            string optionalResult, typeName;
+            if (funDecl.returnType == "")
+                optionalResult = "int ";
             else
             {
-                type_names.TryGetValue(fun_decl.return_type, out type_name);
-                optional_result = $"{type_name} ";
+                typeNames.TryGetValue(funDecl.returnType, out typeName);
+                optionalResult = $"{typeName} ";
             }
-            var fun_name = main ? "main" : fun_decl.name;
-            f.write($"{optional_result} {fun_name}() {{\n");
+            var funName = main ? "main" : funDecl.name;
+            f.Write($"{optionalResult} {funName}() {{\n");
             indent += 1;
-            foreach (var statement in fun_decl.statements)
-                write_statement(f, statement);
+            foreach (var statement in funDecl.statements)
+                writeStatement(f, statement);
             indent -= 1;
-            f.write("}\n");
+            f.Write("}\n");
     	}
 
-        public override void write_var_decl(Writer f, VarDecl var_decl)
+        protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
-            if (var_decl == null)
-                throw new ArgumentNullException(nameof(var_decl));
+            if (varDecl == null)
+                throw new ArgumentNullException(nameof(varDecl));
 
-            write_indent(f);
-            f.write("int ");
-            write_lval(f, var_decl.name);
-            f.write(" = ");
-            write_expr(f, var_decl.expr);
-            f.write(";\n");
+            writeIndent(f);
+            f.Write("int ");
+            writeLval(f, varDecl.name);
+            f.Write(" = ");
+            writeExpr(f, varDecl.expr);
+            f.Write(";\n");
     	}
 
-        public override void write_assignment(Writer f, Assignment assignment)
+        protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
             if (assignment == null)
                 throw new ArgumentNullException(nameof(assignment));
 
-            write_indent(f);
-            write_lval(f, assignment.lval);
-            f.write(" = ");
-            write_expr(f, assignment.expr);
-            f.write(";\n");
+            writeIndent(f);
+            writeLval(f, assignment.lval);
+            f.Write(" = ");
+            writeExpr(f, assignment.expr);
+            f.Write(";\n");
     	}
 
-        public override void write_return(Writer f, Return statement)
+        protected override void writeReturn(StreamWriter f, Return statement)
         {
             if (statement == null)
                 throw new ArgumentNullException(nameof(statement));
 
-            write_indent(f);
-            f.write("return ");
-            write_expr(f, statement.expr);
-            f.write(";\n");
+            writeIndent(f);
+            f.Write("return ");
+            writeExpr(f, statement.expr);
+            f.Write(";\n");
     	}
 
-        public override void write_print(Writer f, Print statement)
+        protected override void writePrint(StreamWriter f, Print statement)
         {
             if (statement == null)
                 throw new ArgumentNullException(nameof(statement));
 
-            write_indent(f);
-            f.write("printf(\"%i\\n\", ");
-            write_expr(f, statement.expr);
-            f.write(");\n");
+            writeIndent(f);
+            f.Write("printf(\"%i\\n\", ");
+            writeExpr(f, statement.expr);
+            f.Write(");\n");
         }
     }
 
     class CLang : CppLang
     {
-        public override string ext => "c";
+        protected override string ext => "c";
 
-        public override void write_program(Writer f, Program program)
+        public override void WriteProgram(StreamWriter f, Program program)
         {
             if (program == null)
                 throw new ArgumentNullException(nameof(program));
 
-            f.write("#include <stdio.h>\n\n");
-            foreach (var fun_decl in program.functions)
+            f.Write("#include <stdio.h>\n\n");
+            foreach (var funDecl in program.functions)
             {
-                write_fun_decl(f, fun_decl);
-                f.write("\n");
+                writeFunDecl(f, funDecl);
+                f.Write("\n");
             }
-            write_fun_decl(f, program.main, true);
+            writeFunDecl(f, program.main, true);
         }
     }
 
     class DLang : Lang
     {
-        public override string ext => "d";
+        protected override string ext => "d";
 
-        public Dictionary<string, string> type_names => new Dictionary<string, string> {
+        public Dictionary<string, string> typeNames => new Dictionary<string, string> {
             ["int"] = "int",
         };
 
-        public override void write_program(Writer f, Program program)
+        public override void WriteProgram(StreamWriter f, Program program)
         {
             if (program == null)
                 throw new ArgumentNullException(nameof(program));
 
-            f.write("import std.stdio;\n\n");
-            foreach (var fun_decl in program.functions)
-                write_fun_decl(f, fun_decl);
-                f.write("\n");
-            write_fun_decl(f, program.main, true);
+            f.Write("import std.stdio;\n\n");
+            foreach (var funDecl in program.functions)
+                writeFunDecl(f, funDecl);
+                f.Write("\n");
+            writeFunDecl(f, program.main, true);
     	}
 
-        public override void write_fun_decl(Writer f, FunDecl fun_decl, bool main=false)
+        protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
-            if (fun_decl == null)
-                throw new ArgumentNullException(nameof(fun_decl));
+            if (funDecl == null)
+                throw new ArgumentNullException(nameof(funDecl));
 
-            string optional_result, type_name;
-            if (fun_decl.return_type == "")
-                optional_result = "void ";
+            string optionalResult, typeName;
+            if (funDecl.returnType == "")
+                optionalResult = "void ";
             else
             {
-                type_names.TryGetValue(fun_decl.return_type, out type_name);
-                optional_result = $"{type_name} ";
+                typeNames.TryGetValue(funDecl.returnType, out typeName);
+                optionalResult = $"{typeName} ";
             }
-            var fun_name = main ? "main" : fun_decl.name;
-            f.write($"{optional_result} {fun_name}() {{\n");
+            var funName = main ? "main" : funDecl.name;
+            f.Write($"{optionalResult} {funName}() {{\n");
             indent += 1;
-            foreach (var statement in fun_decl.statements)
-                write_statement(f, statement);
+            foreach (var statement in funDecl.statements)
+                writeStatement(f, statement);
             indent -= 1;
-            f.write("}\n");
+            f.Write("}\n");
     	}
 
-        public override void write_var_decl(Writer f, VarDecl var_decl)
+        protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
-            if (var_decl == null)
-                throw new ArgumentNullException(nameof(var_decl));
+            if (varDecl == null)
+                throw new ArgumentNullException(nameof(varDecl));
 
-            write_indent(f);
-            f.write("int ");
-            write_lval(f, var_decl.name);
-            f.write(" = ");
-            write_expr(f, var_decl.expr);
-            f.write(";\n");
+            writeIndent(f);
+            f.Write("int ");
+            writeLval(f, varDecl.name);
+            f.Write(" = ");
+            writeExpr(f, varDecl.expr);
+            f.Write(";\n");
     	}
 
-        public override void write_assignment(Writer f, Assignment assignment)
+        protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
             if (assignment == null)
                 throw new ArgumentNullException(nameof(assignment));
 
-            write_indent(f);
-            write_lval(f, assignment.lval);
-            f.write(" = ");
-            write_expr(f, assignment.expr);
-            f.write(";\n");
+            writeIndent(f);
+            writeLval(f, assignment.lval);
+            f.Write(" = ");
+            writeExpr(f, assignment.expr);
+            f.Write(";\n");
     	}
 
-        public override void write_return(Writer f, Return statement)
+        protected override void writeReturn(StreamWriter f, Return statement)
         {
             if (statement == null)
                 throw new ArgumentNullException(nameof(statement));
 
-            write_indent(f);
-            f.write("return ");
-            write_expr(f, statement.expr);
-            f.write(";\n");
+            writeIndent(f);
+            f.Write("return ");
+            writeExpr(f, statement.expr);
+            f.Write(";\n");
     	}
 
-        public override void write_print(Writer f, Print statement)
+        protected override void writePrint(StreamWriter f, Print statement)
         {
             if (statement == null)
                 throw new ArgumentNullException(nameof(statement));
 
-            write_indent(f);
-            f.write("writefln(\"%d\", ");
-            write_expr(f, statement.expr);
-            f.write(");\n");
+            writeIndent(f);
+            f.Write("writefln(\"%d\", ");
+            writeExpr(f, statement.expr);
+            f.Write(");\n");
         }
     }
 
     class GoLang : Lang
     {
-        public override string ext => "go";
+        protected override string ext => "go";
 
-        public Dictionary<string, string> type_names => new Dictionary<string, string> {
+        public Dictionary<string, string> typeNames => new Dictionary<string, string> {
             ["int"] = "int",
         };
 
-        public override void write_program(Writer f, Program program)
+        public override void WriteProgram(StreamWriter f, Program program)
         {
             if (program == null)
                 throw new ArgumentNullException(nameof(program));
 
-            f.write("package main\n\n");
-            f.write("import \"fmt\"\n\n");
-            foreach (var fun_decl in program.functions)
+            f.Write("package main\n\n");
+            f.Write("import \"fmt\"\n\n");
+            foreach (var funDecl in program.functions)
             {
-                write_fun_decl(f, fun_decl);
-                f.write("\n");
+                writeFunDecl(f, funDecl);
+                f.Write("\n");
             }
-            write_fun_decl(f, program.main, true);
+            writeFunDecl(f, program.main, true);
     	}
 
-        public override void write_fun_decl(Writer f, FunDecl fun_decl, bool main=false)
+        protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
-            if (fun_decl == null)
-                throw new ArgumentNullException(nameof(fun_decl));
+            if (funDecl == null)
+                throw new ArgumentNullException(nameof(funDecl));
 
-            string optional_result, type_name;
-            if (fun_decl.return_type == "")
-                optional_result = "";
+            string optionalResult, typeName;
+            if (funDecl.returnType == "")
+                optionalResult = "";
             else
             {
-                type_names.TryGetValue(fun_decl.return_type, out type_name);
-                optional_result = " " + type_name;
+                typeNames.TryGetValue(funDecl.returnType, out typeName);
+                optionalResult = " " + typeName;
             }
-            var fun_name = main ? "main" : fun_decl.name;
-            f.write($"func {fun_name}(){optional_result} {{\n");
+            var funName = main ? "main" : funDecl.name;
+            f.Write($"func {funName}(){optionalResult} {{\n");
             indent += 1;
-            foreach (var statement in fun_decl.statements)
-                write_statement(f, statement);
+            foreach (var statement in funDecl.statements)
+                writeStatement(f, statement);
             indent -= 1;
-            f.write("}\n");
+            f.Write("}\n");
     	}
 
-        public override void write_var_decl(Writer f, VarDecl var_decl)
+        protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
-            if (var_decl == null)
-                throw new ArgumentNullException(nameof(var_decl));
+            if (varDecl == null)
+                throw new ArgumentNullException(nameof(varDecl));
 
-            write_indent(f);
-            write_lval(f, var_decl.name);
-            f.write(" := ");
-            write_expr(f, var_decl.expr);
-            f.write("\n");
+            writeIndent(f);
+            writeLval(f, varDecl.name);
+            f.Write(" := ");
+            writeExpr(f, varDecl.expr);
+            f.Write("\n");
     	}
 
-        public override void write_assignment(Writer f, Assignment assignment)
+        protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
             if (assignment == null)
                 throw new ArgumentNullException(nameof(assignment));
 
-            write_indent(f);
-            write_lval(f, assignment.lval);
-            f.write(" = ");
-            write_expr(f, assignment.expr);
-            f.write("\n");
+            writeIndent(f);
+            writeLval(f, assignment.lval);
+            f.Write(" = ");
+            writeExpr(f, assignment.expr);
+            f.Write("\n");
     	}
 
-        public override void write_return(Writer f, Return statement)
+        protected override void writeReturn(StreamWriter f, Return statement)
         {
             if (statement == null)
                 throw new ArgumentNullException(nameof(statement));
 
-            write_indent(f);
-            f.write("return ");
-            write_expr(f, statement.expr);
-            f.write("\n");
+            writeIndent(f);
+            f.Write("return ");
+            writeExpr(f, statement.expr);
+            f.Write("\n");
     	}
 
-        public override void write_print(Writer f, Print statement)
+        protected override void writePrint(StreamWriter f, Print statement)
         {
             if (statement == null)
                 throw new ArgumentNullException(nameof(statement));
 
-            write_indent(f);
-            f.write("fmt.Printf(\"%d\\n\", ");
-            write_expr(f, statement.expr);
-            f.write(")\n");
+            writeIndent(f);
+            f.Write("fmt.Printf(\"%d\\n\", ");
+            writeExpr(f, statement.expr);
+            f.Write(")\n");
         }
     }
 
     class PascalLang : Lang
     {
-        public override string ext => "pas";
+        protected override string ext => "pas";
 
-        public Dictionary<string, string> type_names => new Dictionary<string, string> {
+        public Dictionary<string, string> typeNames => new Dictionary<string, string> {
             ["int"] = "integer",
         };
 
-        public override Dictionary<string, string> operators => new Dictionary<string, string> {
+        protected override Dictionary<string, string> operators => new Dictionary<string, string> {
             ["&"] = "and",
             ["|"] = "or",
             ["^"] = "xor",
         };
 
-        public override void write_program(Writer f, Program program)
+        public override void WriteProgram(StreamWriter f, Program program)
         {
             if (program == null)
                 throw new ArgumentNullException(nameof(program));
 
-            f.write("program main;\n\n");
-            foreach (var fun_decl in program.functions)
+            f.Write("program main;\n\n");
+            foreach (var funDecl in program.functions)
             {
-                write_fun_decl(f, fun_decl);
-                f.write("\n");
+                writeFunDecl(f, funDecl);
+                f.Write("\n");
             }
-            write_fun_decl(f, program.main, true);
+            writeFunDecl(f, program.main, true);
     	}
 
-        public override void write_fun_decl(Writer f, FunDecl fun_decl, bool main=false)
+        protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
-            if (fun_decl == null)
-                throw new ArgumentNullException(nameof(fun_decl));
+            if (funDecl == null)
+                throw new ArgumentNullException(nameof(funDecl));
 
-            string fun_name;
-            string type_name;
+            string funName;
+            string typeName;
             if (!main)
             {
-                fun_name = fun_decl.name;
-                type_names.TryGetValue(fun_decl.return_type, out type_name);
-                f.write($"function {fun_name}() : {type_name};\n");
+                funName = funDecl.name;
+                typeNames.TryGetValue(funDecl.returnType, out typeName);
+                f.Write($"function {funName}() : {typeName};\n");
             }
-            var vars = fun_decl.statements.OfType<VarDecl>();
+            var vars = funDecl.statements.OfType<VarDecl>();
             if (vars != null && vars.Any())
             {
-                f.write("var\n");
+                f.Write("var\n");
                 foreach (var v in vars)
                 {
-                    type_name = type_names["int"];
-                    f.write($"  {v.name} : {type_name};\n");
+                    typeName = typeNames["int"];
+                    f.Write($"  {v.name} : {typeName};\n");
                 }
             }
-            f.write("begin\n");
+            f.Write("begin\n");
             indent += 1;
-            foreach (var statement in fun_decl.statements)
-                write_statement(f, statement);
+            foreach (var statement in funDecl.statements)
+                writeStatement(f, statement);
             indent -= 1;
-            f.write("end{(main ? '.' : ';')}\n");
+            f.Write("end{(main ? '.' : ';')}\n");
     	}
 
-        public override void write_var_decl(Writer f, VarDecl var_decl)
+        protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
-            if (var_decl == null)
-                throw new ArgumentNullException(nameof(var_decl));
+            if (varDecl == null)
+                throw new ArgumentNullException(nameof(varDecl));
 
-            write_indent(f);
-            write_lval(f, var_decl.name);
-            f.write(" := ");
-            write_expr(f, var_decl.expr);
-            f.write(";\n");
+            writeIndent(f);
+            writeLval(f, varDecl.name);
+            f.Write(" := ");
+            writeExpr(f, varDecl.expr);
+            f.Write(";\n");
     	}
 
-        public override void write_assignment(Writer f, Assignment assignment)
+        protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
             if (assignment == null)
                 throw new ArgumentNullException(nameof(assignment));
 
-            write_indent(f);
-            write_lval(f, assignment.lval);
-            f.write(" := ");
-            write_expr(f, assignment.expr);
-            f.write(";\n");
+            writeIndent(f);
+            writeLval(f, assignment.lval);
+            f.Write(" := ");
+            writeExpr(f, assignment.expr);
+            f.Write(";\n");
     	}
 
-        public override void write_return(Writer f, Return statement)
+        protected override void writeReturn(StreamWriter f, Return statement)
         {
             if (statement == null)
                 throw new ArgumentNullException(nameof(statement));
 
-            write_indent(f);
-            write_lval(f, statement.expr.name);
-            f.write(" := ");
-            write_expr(f, statement.expr);
-            f.write(";\n");
+            writeIndent(f);
+            writeLval(f, statement.expr.name);
+            f.Write(" := ");
+            writeExpr(f, statement.expr);
+            f.Write(";\n");
     	}
 
-        public override void write_print(Writer f, Print statement)
+        protected override void writePrint(StreamWriter f, Print statement)
         {
             if (statement == null)
                 throw new ArgumentNullException(nameof(statement));
 
-            write_indent(f);
-            f.write("writeln(");
-            write_expr(f, statement.expr);
-            f.write(");\n");
+            writeIndent(f);
+            f.Write("writeln(");
+            writeExpr(f, statement.expr);
+            f.Write(");\n");
         }
     }
 
     class RustLang : Lang
     {
-        public override string ext => "rs";
+        protected override string ext => "rs";
 
-        public Dictionary<string, string> type_names => new Dictionary<string, string> {
+        public Dictionary<string, string> typeNames => new Dictionary<string, string> {
             ["int"] = "i32",
         };
 
-        public override void write_program(Writer f, Program program)
+        public override void WriteProgram(StreamWriter f, Program program)
         {
             if (program == null)
                 throw new ArgumentNullException(nameof(program));
 
-            f.write("#![allow(unused_parens)]\n\n");
-            foreach (var fun_decl in program.functions)
+            f.Write("#![allow(unusedParens)]\n\n");
+            foreach (var funDecl in program.functions)
             {
-                write_fun_decl(f, fun_decl);
-                f.write("\n");
+                writeFunDecl(f, funDecl);
+                f.Write("\n");
             }
-            write_fun_decl(f, program.main, true);
+            writeFunDecl(f, program.main, true);
     	}
 
-        public override void write_fun_decl(Writer f, FunDecl fun_decl, bool main=false)
+        protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
-            if (fun_decl == null)
-                throw new ArgumentNullException(nameof(fun_decl));
+            if (funDecl == null)
+                throw new ArgumentNullException(nameof(funDecl));
 
-            string optional_result;
-            string fun_name, type_name;
-            if (fun_decl.return_type == "")
-                optional_result = "";
+            string optionalResult;
+            string funName, typeName;
+            if (funDecl.returnType == "")
+                optionalResult = "";
             else
             {
-                type_names.TryGetValue(fun_decl.return_type, out type_name);
-                optional_result = $" -> {type_name}";
+                typeNames.TryGetValue(funDecl.returnType, out typeName);
+                optionalResult = $" -> {typeName}";
             }
-            fun_name = main ? "main" : fun_decl.name;
-            f.write($"fn {fun_name}(){optional_result} {{\n");
+            funName = main ? "main" : funDecl.name;
+            f.Write($"fn {funName}(){optionalResult} {{\n");
             indent += 1;
-            foreach (var statement in fun_decl.statements)
-                write_statement(f, statement);
+            foreach (var statement in funDecl.statements)
+                writeStatement(f, statement);
             indent -= 1;
-            f.write("}\n");
+            f.Write("}\n");
     	}
 
-        public override void write_var_decl(Writer f, VarDecl var_decl)
+        protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
-            if (var_decl == null)
-                throw new ArgumentNullException(nameof(var_decl));
+            if (varDecl == null)
+                throw new ArgumentNullException(nameof(varDecl));
 
-            write_indent(f);
-            f.write("let ");
-            if (var_decl.mut)
-                f.write("mut ");
-            write_lval(f, var_decl.name);
-            f.write(": i32");
-            f.write(" = ");
-            write_expr(f, var_decl.expr);
-            f.write(";\n");
+            writeIndent(f);
+            f.Write("let ");
+            if (varDecl.mut)
+                f.Write("mut ");
+            writeLval(f, varDecl.name);
+            f.Write(": i32");
+            f.Write(" = ");
+            writeExpr(f, varDecl.expr);
+            f.Write(";\n");
     	}
 
-        public override void write_assignment(Writer f, Assignment assignment)
+        protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
             if (assignment == null)
                 throw new ArgumentNullException(nameof(assignment));
 
-            write_indent(f);
-            write_lval(f, assignment.lval);
-            f.write(" = ");
-            write_expr(f, assignment.expr);
-            f.write(";\n");
+            writeIndent(f);
+            writeLval(f, assignment.lval);
+            f.Write(" = ");
+            writeExpr(f, assignment.expr);
+            f.Write(";\n");
     	}
 
-        public override void write_return(Writer f, Return statement)
+        protected override void writeReturn(StreamWriter f, Return statement)
         {
             if (statement == null)
                 throw new ArgumentNullException(nameof(statement));
 
-            write_indent(f);
-            write_expr(f, statement.expr);
-            f.write("\n");
+            writeIndent(f);
+            writeExpr(f, statement.expr);
+            f.Write("\n");
     	}
 
-        public override void write_print(Writer f, Print statement)
+        protected override void writePrint(StreamWriter f, Print statement)
         {
             if (statement == null)
                 throw new ArgumentNullException(nameof(statement));
 
-            write_indent(f);
-            f.write("println!(\"{}\", ");
-            write_expr(f, statement.expr);
-            f.write(")\n");
+            writeIndent(f);
+            f.Write("println!(\"{}\", ");
+            writeExpr(f, statement.expr);
+            f.Write(")\n");
         }
     }
 
     class OCamlLang : Lang
     {
-        public override string ext => "ml";
+        protected override string ext => "ml";
 
-        public Dictionary<string, string> type_names => new Dictionary<string, string> {
+        public Dictionary<string, string> typeNames => new Dictionary<string, string> {
             ["int"] = "int"
         };
 
-        public override Dictionary<string, string> operators => new Dictionary<string, string> {
+        protected override Dictionary<string, string> operators => new Dictionary<string, string> {
             ["&"] = "land",
             ["|"] = "lor",
             ["^"] = "lxor",
         };
 
-        public override void write_program(Writer f, Program program)
+        public override void WriteProgram(StreamWriter f, Program program)
         {
             if (program == null)
                 throw new ArgumentNullException(nameof(program));
 
-            foreach (var fun_decl in program.functions)
+            foreach (var funDecl in program.functions)
             {
-                write_fun_decl(f, fun_decl);
-                f.write("\n");
+                writeFunDecl(f, funDecl);
+                f.Write("\n");
             }
-            write_fun_decl(f, program.main, true);
+            writeFunDecl(f, program.main, true);
     	}
 
-        public override void write_fun_decl(Writer f, FunDecl fun_decl, bool main=false)
+        protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
-            if (fun_decl == null)
-                throw new ArgumentNullException(nameof(fun_decl));
+            if (funDecl == null)
+                throw new ArgumentNullException(nameof(funDecl));
 
-            string optional_result, type_name;
-            if (fun_decl.return_type == "")
-                optional_result = "";
+            string optionalResult, typeName;
+            if (funDecl.returnType == "")
+                optionalResult = "";
             else
             {
-                type_names.TryGetValue(fun_decl.return_type, out type_name);
-                optional_result = $":{type_name} ";
+                typeNames.TryGetValue(funDecl.returnType, out typeName);
+                optionalResult = $":{typeName} ";
             }
-            var fun_name = main ? "main" : fun_decl.name;
-            f.write($"let {fun_name} (){optional_result} = \n");
+            var funName = main ? "main" : funDecl.name;
+            f.Write($"let {funName} (){optionalResult} = \n");
             indent += 1;
-            foreach (var statement in fun_decl.statements)
-                write_statement(f, statement);
+            foreach (var statement in funDecl.statements)
+                writeStatement(f, statement);
             indent -= 1;
             if (main)
-                f.write("\nmain ()");
+                f.Write("\nmain ()");
     	}
 
-        public override void write_var_decl(Writer f, VarDecl var_decl)
+        protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
-            if (var_decl == null)
-                throw new ArgumentNullException(nameof(var_decl));
+            if (varDecl == null)
+                throw new ArgumentNullException(nameof(varDecl));
 
-            write_indent(f);
-            f.write("let ");
-            write_lval(f, var_decl.name);
-            f.write(" = ");
-            write_expr(f, var_decl.expr);
-            f.write(" in \n");
+            writeIndent(f);
+            f.Write("let ");
+            writeLval(f, varDecl.name);
+            f.Write(" = ");
+            writeExpr(f, varDecl.expr);
+            f.Write(" in \n");
     	}
 
-        public override void write_assignment(Writer f, Assignment assignment)
+        protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
             if (assignment == null)
                 throw new ArgumentNullException(nameof(assignment));
 
-            write_indent(f);
-            f.write("let ");
-            write_lval(f, assignment.lval);
-            f.write(" = ");
-            write_expr(f, assignment.expr);
-            f.write(" in \n");
+            writeIndent(f);
+            f.Write("let ");
+            writeLval(f, assignment.lval);
+            f.Write(" = ");
+            writeExpr(f, assignment.expr);
+            f.Write(" in \n");
     	}
 
-        public override void write_return(Writer f, Return statement)
+        protected override void writeReturn(StreamWriter f, Return statement)
         {
             if (statement == null)
                 throw new ArgumentNullException(nameof(statement));
 
-            write_indent(f);
-            write_expr(f, statement.expr);
-            f.write("\n");
+            writeIndent(f);
+            writeExpr(f, statement.expr);
+            f.Write("\n");
     	}
 
-        public override void write_print(Writer f, Print statement)
+        protected override void writePrint(StreamWriter f, Print statement)
         {
             if (statement == null)
                 throw new ArgumentNullException(nameof(statement));
 
-            write_indent(f);
-            f.write("Printf.printf \"%i\\n\" (");
-            write_expr(f, statement.expr);
-            f.write(");;\n");
+            writeIndent(f);
+            f.Write("Printf.printf \"%i\\n\" (");
+            writeExpr(f, statement.expr);
+            f.Write(");;\n");
         }
     }
 
     class FSharpLang : Lang
     {
-        public override string ext => "fs";
+        protected override string ext => "fs";
 
-        public Dictionary<string, string> type_names => new Dictionary<string, string> {
+        public Dictionary<string, string> typeNames => new Dictionary<string, string> {
             ["int"] = "int"
         };
 
-        public override Dictionary<string, string> operators => new Dictionary<string, string> {
+        protected override Dictionary<string, string> operators => new Dictionary<string, string> {
             ["&"] = "&&&",
             ["|"] = "|||",
             ["^"] = "^^^",
     	};
 
-        public override void write_program(Writer f, Program program)
+        public override void WriteProgram(StreamWriter f, Program program)
         {
             if (program == null)
                 throw new ArgumentNullException(nameof(program));
 
-            foreach (var fun_decl in program.functions)
+            foreach (var funDecl in program.functions)
             {
-                write_fun_decl(f, fun_decl);
-                f.write("\n");
+                writeFunDecl(f, funDecl);
+                f.Write("\n");
             }
-            write_fun_decl(f, program.main, true);
+            writeFunDecl(f, program.main, true);
     	}
 
-        public override void write_fun_decl(Writer f, FunDecl fun_decl, bool main=false)
+        protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
-            if (fun_decl == null)
-                throw new ArgumentNullException(nameof(fun_decl));
+            if (funDecl == null)
+                throw new ArgumentNullException(nameof(funDecl));
 
-            string optional_result, type_name;
-            if (fun_decl.return_type == "")
-                optional_result = "";
+            string optionalResult, typeName;
+            if (funDecl.returnType == "")
+                optionalResult = "";
             else
             {
-                type_names.TryGetValue(fun_decl.return_type, out type_name);
-                optional_result = ":" + type_name + " ";
+                typeNames.TryGetValue(funDecl.returnType, out typeName);
+                optionalResult = ":" + typeName + " ";
             }
-            var fun_name = main ? "main" : fun_decl.name;
-            f.write($"let {fun_name} (){optional_result} = \n");
+            var funName = main ? "main" : funDecl.name;
+            f.Write($"let {funName} (){optionalResult} = \n");
             indent += 1;
-            foreach (var statement in fun_decl.statements)
-                write_statement(f, statement);
+            foreach (var statement in funDecl.statements)
+                writeStatement(f, statement);
             indent -= 1;
             if (main)
-                f.write("\nmain ()");
+                f.Write("\nmain ()");
     	}
 
-        public override void write_var_decl(Writer f, VarDecl var_decl)
+        protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
-            if (var_decl == null)
-                throw new ArgumentNullException(nameof(var_decl));
+            if (varDecl == null)
+                throw new ArgumentNullException(nameof(varDecl));
 
-            write_indent(f);
-            f.write("let ");
-            write_lval(f, var_decl.name);
-            f.write(" = ");
-            write_expr(f, var_decl.expr);
-            f.write(" in \n");
+            writeIndent(f);
+            f.Write("let ");
+            writeLval(f, varDecl.name);
+            f.Write(" = ");
+            writeExpr(f, varDecl.expr);
+            f.Write(" in \n");
     	}
 
-        public override void write_assignment(Writer f, Assignment assignment)
+        protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
             if (assignment == null)
                 throw new ArgumentNullException(nameof(assignment));
 
-            write_indent(f);
-            f.write("let ");
-            write_lval(f, assignment.lval);
-            f.write(" = ");
-            write_expr(f, assignment.expr);
-            f.write(" in \n");
+            writeIndent(f);
+            f.Write("let ");
+            writeLval(f, assignment.lval);
+            f.Write(" = ");
+            writeExpr(f, assignment.expr);
+            f.Write(" in \n");
     	}
 
-        public override void write_return(Writer f, Return statement)
+        protected override void writeReturn(StreamWriter f, Return statement)
         {
             if (statement == null)
                 throw new ArgumentNullException(nameof(statement));
 
-            write_indent(f);
-            write_expr(f, statement.expr);
-            f.write("\n");
+            writeIndent(f);
+            writeExpr(f, statement.expr);
+            f.Write("\n");
     	}
 
-        public override void write_print(Writer f, Print statement)
+        protected override void writePrint(StreamWriter f, Print statement)
         {
             if (statement == null)
                 throw new ArgumentNullException(nameof(statement));
 
-            write_indent(f);
-            f.write("printfn \"%i\\n\" (");
-            write_expr(f, statement.expr);
-            f.write(");;\n");
+            writeIndent(f);
+            f.Write("printfn \"%i\\n\" (");
+            writeExpr(f, statement.expr);
+            f.Write(");;\n");
         }
 
     }
 
     class HaskellLang : Lang
     {
-        public override string ext => "hs";
+        protected override string ext => "hs";
 
-        public Dictionary<string, string> type_names => new Dictionary<string, string> {
+        public Dictionary<string, string> typeNames => new Dictionary<string, string> {
             ["int"] = "Int64"
         };
 
-        public override Dictionary<string, string> operators => new Dictionary<string, string> {
+        protected override Dictionary<string, string> operators => new Dictionary<string, string> {
             ["&"] = "&&&",
             ["|"] = "|||",
             ["^"] = "^^^",
     	};
 
-        public override void write_program(Writer f, Program program)
+        public override void WriteProgram(StreamWriter f, Program program)
         {
             if (program == null)
                 throw new ArgumentNullException(nameof(program));
 
-            f.write("import GHC.Int\n"
+            f.Write("import GHC.Int\n"
                     + "import Data.Bits\n"
                     + "import Text.Printf\n\n");
             // removes ambiguity and forces 32-bit integers
-            f.write(  "(&&&) :: Int32 -> Int32 -> Int32\n"
+            f.Write(  "(&&&) :: Int32 -> Int32 -> Int32\n"
                     + "a &&& b = a .&. b\n"
                     + "(|||) :: Int32 -> Int32 -> Int32\n"
                     + "a ||| b = a .|. b\n"
                     + "(^^^) :: Int32 -> Int32 -> Int32\n"
                     + "a ^^^ b = a `xor` b\n\n");
-            foreach (var fun_decl in program.functions)
+            foreach (var funDecl in program.functions)
             {
-                write_fun_decl(f, fun_decl);
-                f.write("\n");
+                writeFunDecl(f, funDecl);
+                f.Write("\n");
             }
-            write_fun_decl(f, program.main, true);
+            writeFunDecl(f, program.main, true);
     	}
 
-        public override void write_fun_decl(Writer f, FunDecl fun_decl, bool main=false)
+        protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
-            if (fun_decl == null)
-                throw new ArgumentNullException(nameof(fun_decl));
+            if (funDecl == null)
+                throw new ArgumentNullException(nameof(funDecl));
 
             string fund;
             if (main)
             {
                 fund = "main = ";
-                f.write("main :: IO ()\n");
-                f.write(fund);
+                f.Write("main :: IO ()\n");
+                f.Write(fund);
             }
             else
             {
-                fund = $"{fun_decl.name} = ";
-                f.write(fun_decl.name + " :: Int32\n");
-                f.write(fund);
+                fund = $"{funDecl.name} = ";
+                f.Write(funDecl.name + " :: Int32\n");
+                f.Write(fund);
             }
 
-            if (fun_decl.statements.Count > 0)
-                write_statement(f, fun_decl.statements[0]);
-            extra_indent = fund.Length;
-            foreach (var statement in fun_decl.statements.Skip(1))
-                write_statement(f, statement);
-            extra_indent = 0;
+            if (funDecl.statements.Count > 0)
+                writeStatement(f, funDecl.statements[0]);
+            extraIndent = fund.Length;
+            foreach (var statement in funDecl.statements.Skip(1))
+                writeStatement(f, statement);
+            extraIndent = 0;
     	}
 
-        public override void write_var_decl(Writer f, VarDecl var_decl)
+        protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
-            if (var_decl == null)
-                throw new ArgumentNullException(nameof(var_decl));
+            if (varDecl == null)
+                throw new ArgumentNullException(nameof(varDecl));
 
-            write_indent(f);
-            f.write("let ");
-            write_lval(f, var_decl.name);
-            f.write(" = ");
-            write_expr(f, var_decl.expr);
-            f.write(" in \n");
+            writeIndent(f);
+            f.Write("let ");
+            writeLval(f, varDecl.name);
+            f.Write(" = ");
+            writeExpr(f, varDecl.expr);
+            f.Write(" in \n");
     	}
 
-        public override void write_assignment(Writer f, Assignment assignment)
+        protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
             if (assignment == null)
                 throw new ArgumentNullException(nameof(assignment));
@@ -1306,309 +1275,309 @@ namespace CompilerBenchmarker
             if (assignment.expr is VarExpr && assignment.lval == assignment.expr.name)
                 return;
 
-            write_indent(f);
-            f.write("let ");
-            write_lval(f, assignment.lval);
-            f.write(" = ");
-            write_expr(f, assignment.expr);
-            f.write(" in \n");
+            writeIndent(f);
+            f.Write("let ");
+            writeLval(f, assignment.lval);
+            f.Write(" = ");
+            writeExpr(f, assignment.expr);
+            f.Write(" in \n");
     	}
 
-        public override void write_return(Writer f, Return statement)
+        protected override void writeReturn(StreamWriter f, Return statement)
         {
             if (statement == null)
                 throw new ArgumentNullException(nameof(statement));
 
-            write_indent(f);
-            write_expr(f, statement.expr);
-            f.write("\n");
+            writeIndent(f);
+            writeExpr(f, statement.expr);
+            f.Write("\n");
     	}
 
-        public override void write_print(Writer f, Print statement)
+        protected override void writePrint(StreamWriter f, Print statement)
         {
             if (statement == null)
                 throw new ArgumentNullException(nameof(statement));
 
-            write_indent(f);
-            f.write("printf \"%i\\n\" (");
-            write_expr(f, statement.expr);
-            f.write(")\n");
+            writeIndent(f);
+            f.Write("printf \"%i\\n\" (");
+            writeExpr(f, statement.expr);
+            f.Write(")\n");
     	}
 
-        public override void write_fun_call(Writer f, FunCallExpr expr, bool needs_parens)
+        protected override void writeFunCall(StreamWriter f, FunCallExpr expr, bool needsParens)
         {
-            f.write(expr.name);
+            f.Write(expr.name);
         }
     }
 
     class CSharpLang : CppLang
     {
-        public override string ext => "cs";
+        protected override string ext => "cs";
 
-        public override void write_program(Writer f, Program program)
+        public override void WriteProgram(StreamWriter f, Program program)
         {
             if (program == null)
                 throw new ArgumentNullException(nameof(program));
 
-            f.write("using System;\nnamespace CompilationSpeedTest\n{\n");
+            f.Write("using System;\nnamespace CompilationSpeedTest\n{\n");
             indent += 1;
-            write_indent(f);
-            f.write("static class Program\n");
-    	    write_indent(f);
-            f.write("{\n");
+            writeIndent(f);
+            f.Write("static class Program\n");
+    	    writeIndent(f);
+            f.Write("{\n");
             indent += 1;
-            foreach (var fun_decl in program.functions)
+            foreach (var funDecl in program.functions)
             {
-                write_fun_decl(f, fun_decl);
-                f.write("\n");
+                writeFunDecl(f, funDecl);
+                f.Write("\n");
             }
-            write_fun_decl(f, program.main, true);
-            f.write("\n");
+            writeFunDecl(f, program.main, true);
+            f.Write("\n");
             indent -= 1;
-            write_indent(f);
-            f.write("}\n");
+            writeIndent(f);
+            f.Write("}\n");
             indent -= 1;
-            f.write("}\n");
+            f.Write("}\n");
     	}
 
-        public override void write_fun_decl(Writer f, FunDecl fun_decl, bool main=false)
+        protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
-            if (fun_decl == null)
-                throw new ArgumentNullException(nameof(fun_decl));
+            if (funDecl == null)
+                throw new ArgumentNullException(nameof(funDecl));
 
-            string optional_result, type_name;
-            if (fun_decl.return_type == "")
-                optional_result = "static int";
+            string optionalResult, typeName;
+            if (funDecl.returnType == "")
+                optionalResult = "static int";
             else
             {
-                type_names.TryGetValue(fun_decl.return_type, out type_name);
-                optional_result = "static " + type_name;
+                typeNames.TryGetValue(funDecl.returnType, out typeName);
+                optionalResult = "static " + typeName;
             }
-            var fun_name = main ? "Main" : fun_decl.name;
-            write_indent(f);
-            f.write($"{optional_result} {fun_name}()\n");
-            write_indent(f);
-            f.write("{\n");
+            var funName = main ? "Main" : funDecl.name;
+            writeIndent(f);
+            f.Write($"{optionalResult} {funName}()\n");
+            writeIndent(f);
+            f.Write("{\n");
             indent += 1;
-            foreach (var statement in fun_decl.statements)
-                write_statement(f, statement);
+            foreach (var statement in funDecl.statements)
+                writeStatement(f, statement);
             if (main)
             {
-                write_indent(f);
-                f.write("return 0;\n");
+                writeIndent(f);
+                f.Write("return 0;\n");
             }
             indent -= 1;
-            write_indent(f);
-            f.write("}\n");
+            writeIndent(f);
+            f.Write("}\n");
     	}
 
-        public override void write_print(Writer f, Print statement)
+        protected override void writePrint(StreamWriter f, Print statement)
         {
             if (statement == null)
                 throw new ArgumentNullException(nameof(statement));
 
-            write_indent(f);
-            f.write("Console.WriteLine(\"{i}\\n\", ");
-            write_expr(f, statement.expr);
-            f.write(");\n");
+            writeIndent(f);
+            f.Write("Console.WriteLine(\"{i}\\n\", ");
+            writeExpr(f, statement.expr);
+            f.Write(");\n");
         }
     }
 
     class JavaLang : CSharpLang
     {
-        public override string ext => "java";
+        protected override string ext => "java";
 
-        public override void write_program(Writer f, Program program)
+        public override void WriteProgram(StreamWriter f, Program program)
         {
             if (program == null)
                 throw new ArgumentNullException(nameof(program));
 
-            f.write("package CompilationSpeedTest;\n\n");
-            write_indent(f);
-            f.write("class Program\n");
-            write_indent(f);
-            f.write("{\n");
+            f.Write("package CompilationSpeedTest;\n\n");
+            writeIndent(f);
+            f.Write("class Program\n");
+            writeIndent(f);
+            f.Write("{\n");
             indent += 1;
-            foreach (var fun_decl in program.functions)
+            foreach (var funDecl in program.functions)
             {
-                write_fun_decl(f, fun_decl);
-                f.write("\n");
+                writeFunDecl(f, funDecl);
+                f.Write("\n");
             }
-            write_fun_decl(f, program.main, true);
-            f.write("\n");
+            writeFunDecl(f, program.main, true);
+            f.Write("\n");
             indent -= 1;
-            write_indent(f);
-            f.write("}\n");
+            writeIndent(f);
+            f.Write("}\n");
         }
 
-        public override void write_print(Writer f, Print statement)
+        protected override void writePrint(StreamWriter f, Print statement)
         {
             if (statement == null)
                 throw new ArgumentNullException(nameof(statement));
 
-            write_indent(f);
-            f.write("System.out.format(\"%d\\n\", ");
-            write_expr(f, statement.expr);
-            f.write(");\n");
+            writeIndent(f);
+            f.Write("System.out.format(\"%d\\n\", ");
+            writeExpr(f, statement.expr);
+            f.Write(");\n");
         }
     }
 
     class KotlinLang : Lang
     {
-        public override string ext => "kt";
+        protected override string ext => "kt";
 
-        public Dictionary<string, string> type_names => new Dictionary<string, string> {
+        public Dictionary<string, string> typeNames => new Dictionary<string, string> {
             ["int"] = "Int",
         };
 
-        public override Dictionary<string, string> operators => new Dictionary<string, string> {
+        protected override Dictionary<string, string> operators => new Dictionary<string, string> {
             ["&"] = "and",
             ["|"] = "or",
             ["^"] = "xor"
         };
 
-        public override void write_program(Writer f, Program program)
+        public override void WriteProgram(StreamWriter f, Program program)
         {
             if (program == null)
                 throw new ArgumentNullException(nameof(program));
 
-            foreach (var fun_decl in program.functions)
+            foreach (var funDecl in program.functions)
             {
-                write_fun_decl(f, fun_decl);
-                f.write("\n");
+                writeFunDecl(f, funDecl);
+                f.Write("\n");
             }
-            write_fun_decl(f, program.main, true);
+            writeFunDecl(f, program.main, true);
     	}
 
-        public override void write_fun_decl(Writer f, FunDecl fun_decl, bool main=false)
+        protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
-            if (fun_decl == null)
-                throw new ArgumentNullException(nameof(fun_decl));
+            if (funDecl == null)
+                throw new ArgumentNullException(nameof(funDecl));
 
-            string optional_result, type_name;
-            if (fun_decl.return_type == "")
-                optional_result = "";
+            string optionalResult, typeName;
+            if (funDecl.returnType == "")
+                optionalResult = "";
             else
             {
-                type_names.TryGetValue(fun_decl.return_type, out type_name);
-                optional_result = ": " + type_name;
+                typeNames.TryGetValue(funDecl.returnType, out typeName);
+                optionalResult = ": " + typeName;
             }
-            var fun_name = main ? "main" : fun_decl.name;
-            f.write($"fun {fun_name}(){optional_result} {{\n");
+            var funName = main ? "main" : funDecl.name;
+            f.Write($"fun {funName}(){optionalResult} {{\n");
             indent += 1;
-            foreach (var statement in fun_decl.statements)
-                write_statement(f, statement);
+            foreach (var statement in funDecl.statements)
+                writeStatement(f, statement);
             indent -= 1;
-            f.write("}\n");
+            f.Write("}\n");
     	}
 
-        public override void write_var_decl(Writer f, VarDecl var_decl)
+        protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
-            if (var_decl == null)
-                throw new ArgumentNullException(nameof(var_decl));
+            if (varDecl == null)
+                throw new ArgumentNullException(nameof(varDecl));
 
-            write_indent(f);
-            if (var_decl.mut)
-                f.write("var ");
+            writeIndent(f);
+            if (varDecl.mut)
+                f.Write("var ");
             else
-                f.write("val ");
-            write_lval(f, var_decl.name);
-            f.write(": Int");
-            f.write(" = ");
-            write_expr(f, var_decl.expr);
-            f.write("\n");
+                f.Write("val ");
+            writeLval(f, varDecl.name);
+            f.Write(": Int");
+            f.Write(" = ");
+            writeExpr(f, varDecl.expr);
+            f.Write("\n");
     	}
 
-        public override void write_const_expr(Writer f, ConstExpr expr, bool needs_parens)
+        protected override void writeConstExpr(StreamWriter f, ConstExpr expr, bool needsParens)
         {
-            f.write(expr.val);
+            f.Write(expr.val);
     	}
 
-        public override void write_assignment(Writer f, Assignment assignment)
+        protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
             if (assignment == null)
                 throw new ArgumentNullException(nameof(assignment));
 
-            write_indent(f);
-            write_lval(f, assignment.lval);
-            f.write(" = ");
-            write_expr(f, assignment.expr);
-            f.write("\n");
+            writeIndent(f);
+            writeLval(f, assignment.lval);
+            f.Write(" = ");
+            writeExpr(f, assignment.expr);
+            f.Write("\n");
     	}
 
-        public override void write_return(Writer f, Return statement)
+        protected override void writeReturn(StreamWriter f, Return statement)
         {
             if (statement == null)
                 throw new ArgumentNullException(nameof(statement));
 
-            write_indent(f);
-            f.write("return ");
-            write_expr(f, statement.expr);
-            f.write("\n");
+            writeIndent(f);
+            f.Write("return ");
+            writeExpr(f, statement.expr);
+            f.Write("\n");
     	}
 
-        public override void write_print(Writer f, Print statement)
+        protected override void writePrint(StreamWriter f, Print statement)
         {
             if (statement == null)
                 throw new ArgumentNullException(nameof(statement));
 
-            write_indent(f);
-            f.write("print(");
-            write_expr(f, statement.expr);
-            f.write(")\n");
+            writeIndent(f);
+            f.Write("print(");
+            writeExpr(f, statement.expr);
+            f.Write(")\n");
         }
     }
 
     class ScalaLang : KotlinLang
     {
-        public override string ext => "scala";
+        protected override string ext => "scala";
 
-        public override Dictionary<string, string> operators => new Dictionary<string, string> {
+        protected override Dictionary<string, string> operators => new Dictionary<string, string> {
             ["&"] = "&",
             ["|"] = "|",
             ["^"] = "^"
         };
 
-        public override void write_program(Writer f, Program program)
+        public override void WriteProgram(StreamWriter f, Program program)
         {
             if (program == null)
                 throw new ArgumentNullException(nameof(program));
 
-            f.write("object CompilerBenchmarker {\n");
-            write_indent(f);
-            f.write("\n");
+            f.Write("object CompilerBenchmarker {\n");
+            writeIndent(f);
+            f.Write("\n");
             indent += 1;
-            foreach (var fun_decl in program.functions)
+            foreach (var funDecl in program.functions)
             {
-                write_indent(f);
-                write_fun_decl(f, fun_decl);
-                f.write("\n");
+                writeIndent(f);
+                writeFunDecl(f, funDecl);
+                f.Write("\n");
             }
-            write_fun_decl(f, program.main, true);
+            writeFunDecl(f, program.main, true);
             indent -= 1;
-            f.write("}");
+            f.Write("}");
         }
 
-        public override void write_fun_decl(Writer f, FunDecl fun_decl, bool main=false)
+        protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
-            if (fun_decl == null)
-                throw new ArgumentNullException(nameof(fun_decl));
+            if (funDecl == null)
+                throw new ArgumentNullException(nameof(funDecl));
 
-            string optional_result, type_name;
-            if (fun_decl.return_type == "")
-                optional_result = "";
+            string optionalResult, typeName;
+            if (funDecl.returnType == "")
+                optionalResult = "";
             else
             {
-                type_names.TryGetValue(fun_decl.return_type, out type_name);
-                optional_result = ": " + type_name;
+                typeNames.TryGetValue(funDecl.returnType, out typeName);
+                optionalResult = ": " + typeName;
             }
-            var fun_name = main ? "main" : fun_decl.name;
-            f.write($"def {fun_name}(){optional_result} = {{\n");
+            var funName = main ? "main" : funDecl.name;
+            f.Write($"def {funName}(){optionalResult} = {{\n");
             indent += 1;
-            foreach (var statement in fun_decl.statements)
-                write_statement(f, statement);
+            foreach (var statement in funDecl.statements)
+                writeStatement(f, statement);
             indent -= 1;
-            f.write("}\n");
+            f.Write("}\n");
         }
     }
 
@@ -1639,7 +1608,7 @@ namespace CompilerBenchmarker
             }
         }
 
-        public void WriteLang(string lang, int num_funs, string filename)
+        public void WriteLang(string lang, int numFuns, string filename)
         {
             var langwriter = GetLang(lang);
             if (File.Exists(filename))
@@ -1649,10 +1618,9 @@ namespace CompilerBenchmarker
             // todo: write language files identically
             using (var f = new StreamWriter(filename))
             {
-                langwriter.write_program(
-                    new Writer(f),
-                    new Context().random_program(
-                        num_funs: num_funs, max_statements_per_fun: 20));
+                langwriter.WriteProgram(f,
+                    new Context().randomProgram(
+                        numFuns: numFuns, maxStatementsPerFun: 20));
             }
         }
     }

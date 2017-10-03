@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 
 namespace CompilerBenchmarker
 {
@@ -122,14 +123,17 @@ namespace CompilerBenchmarker
 			var args = string.Join(" ", compiler.Arguments.Concat(new[] { codeFilePath }));
 			Console.WriteLine($"  - Running with {numFun}: {compiler.Exe} {args}");
 			var p = Process.Start(compiler.Exe, args);
-			p.WaitForExit(); // todo: pass in compiler timeout option
+			// todo: pass in compiler timeout option
+			p.WaitForExit();
 			if (p.ExitCode != 0)
 			{
 				watch.Stop();
 				Console.WriteLine($"  ! Compilation failed for '{compiler.Exe} {args}'");
+				Thread.Sleep(2500);
 				return null;
 			}
 
+			// todo: also track memory consumption
 			watch.Stop();
 			Console.WriteLine($"  - Took {watch.Elapsed}");
 			Console.WriteLine();
@@ -163,6 +167,7 @@ namespace CompilerBenchmarker
 					foreach (var compiler in langCompilers)
 					{
 						// run benchmark
+						// todo: if compiler fails at a certain number of functions, do not run it for the next round
 						var bench = RunBenchmark(compiler, codeFilePath, numFun);
 						yield return bench.HasValue
 							? CompilerBenchmark.Success(compiler, bench.Value, numFun)
@@ -207,9 +212,9 @@ namespace CompilerBenchmarker
 
 		static void Main(string[] args)
 		{
-			int numberAtStart = 1;
-			int numberOfSteps = 1;
-			int stepIncreaseNumber = 1000;
+			int numberAtStart = 5000;
+			int numberOfSteps = 10;
+			int stepIncreaseNumber = 5000;
 
 			// todo: good command-line options library for C#?
 			var helpInfo = new Dictionary<string, int>
@@ -227,24 +232,27 @@ namespace CompilerBenchmarker
 			var compilers = new List<Compiler>
 			{
 				// native section
-				new Compiler("C", "c", "gcc", "-O2"),
-				new Compiler("C++", "cpp", "g++", "-O2"),
-				new Compiler("C++", "cpp", "clang", "-O2"),
-				new Compiler("Go", "go", "go", "build"),
-				new Compiler("Rust", "rs", "rustc", "-C", "opt-level=2"),
-				new Compiler("D", "d", "dmd", "-O"),
-				new Compiler("D", "d", "gdc", "-O"),
-				new Compiler("D", "d", "ldc2", "-O"),
-				new Compiler("Haskell", "hs", "ghc"), // optimize?
-				new Compiler("OCaml", "ml", "ocamlopt"), // optimize?
+				// new Compiler("C", "c", "gcc", "-O2"),
+				// new Compiler("C++", "cpp", "g++", "-O2"),
+				// new Compiler("C++", "cpp", "clang", "-O2"),
+				// new Compiler("Go", "go", "go", "build"),
+				// new Compiler("Rust", "rs", "rustc", "-C", "opt-level=2"),
+				// new Compiler("D", "d", "dmd", "-O"),
+				// new Compiler("D", "d", "gdc", "-O"),
+				// new Compiler("D", "d", "ldc2", "-O"),
+				// new Compiler("Haskell", "hs", "ghc", "-O"),
+				// new Compiler("OCaml", "ml", "ocamlopt", "-O2"),
 
-				// VM section
-				new Compiler("CSharp", "cs", "csc"),
-				new Compiler("FSharp", "fs", "fsharpc"),
-				new Compiler("java", "java", "javac"),
-				new Compiler("scala", "scala", "scalac"),
-				new Compiler("Kotlin", "kt", "kotlinc"),
+				// // VM section
+				new Compiler("CSharp", "cs", "csc", "/o"),
+				new Compiler("FSharp", "fs", "fsharpc", "-O"),
+				// new Compiler("Java", "java", "javac", "-J-Xmx4096M", "-J-Xms64M"),
+				new Compiler("Scala", "scala", "scalac", "-optimize"), // modified to use Java -Xmx4096M -Xms64M -Xss4m
+				new Compiler("Scala", "scala", "dotc", "-optimize"), // modified to use Java -Xmx4096M -Xss4m
+				new Compiler("Kotlin", "kt", "kotlinc"), // modified to use Java -Xmx4096M -Xms64M -Xss4m
 			};
+			// todo: verify compilers exist on system
+			// todo: write hardware/software report (compiler version, OS, Kernel, CPU, Memory, HD)
 			// todo: duplicate compiler detection
 			// todo: Ctrl+C writes results so far
 			// todo: other keys to skip/abort language/number functions?
@@ -282,8 +290,6 @@ namespace CompilerBenchmarker
 					}
 				}
 
-				// todo: write results to CSV, with system data (compiler version, OS, Kernel, CPU, Memory, HD)
-				// todo: track memory consumption as well
 				WriteResults(compilers, allBenchmarks, finalResultFileName);
 			}
 			catch (Exception e)
