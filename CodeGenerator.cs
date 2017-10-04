@@ -8,32 +8,29 @@ namespace CompilerBenchmarker
 {
     public static class RandomExtensions
     {
-    	public static T Choice<T>(this Random r, IList<T> of)
-    	{
-    		return of[r.Next(0, of.Count)];
-    	}
+    	public static T Choice<T>(this Random r, IList<T> of) => of[r.Next(0, of.Count)];
     }
 
     public interface IHasUsed
     {
-        bool used {get;set;}
-        string name {get;set;}
+        bool Used {get;set;}
+        string Name {get;set;}
     }
 
     abstract class Expr
     {
-        public virtual string name {get;set;}
+        public virtual string Name {get;set;}
     }
 
     class ConstExpr : Expr
     {
-    	public string val {get;set;}
+    	public string Val {get;set;}
     	public ConstExpr(string val)
     	{
             if (val == null)
                 throw new ArgumentNullException(nameof(val));
 
-            this.val = val;
+            this.Val = val;
         }
     }
 
@@ -44,15 +41,15 @@ namespace CompilerBenchmarker
             if (name == null)
                 throw new ArgumentNullException(nameof(name));
 
-            this.name = name;
+            this.Name = name;
         }
     }
 
     class BinOp : Expr
     {
-    	public string op {get;set;}
-    	public Expr left {get;set;}
-    	public Expr right {get;set;}
+    	public string Op {get;set;}
+    	public Expr Left {get;set;}
+    	public Expr Right {get;set;}
     	public BinOp(string op, Expr left, Expr right)
     	{
             if (op == null)
@@ -63,32 +60,32 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(right));
 
 
-            this.op = op;
-            this.left = left;
-            this.right = right;
+            this.Op = op;
+            this.Left = left;
+            this.Right = right;
         }
     }
 
     class FunCallExpr : Expr
     {
-    	public override string name {get;set;}
+    	public override string Name {get;set;}
     	public FunCallExpr(string name)
     	{
             if (name == null)
                 throw new ArgumentNullException(nameof(name));
 
-            this.name = name;
+            this.Name = name;
         }
     }
 
     abstract class Statement
     {
-        public Expr expr {get;set;}
+        public Expr Expr {get;set;}
     }
 
     class Assignment : Statement
     {
-    	public string lval {get;set;}
+    	public string Lval {get;set;}
     	public Assignment(string lval, Expr expr)
     	{
             if (expr == null)
@@ -96,16 +93,16 @@ namespace CompilerBenchmarker
             if (lval == null)
                 throw new ArgumentNullException(nameof(lval));
 
-            this.lval = lval;
-            this.expr = expr;
+            this.Lval = lval;
+            this.Expr = expr;
         }
     }
 
     class VarDecl : Statement, IHasUsed
     {
-    	public string name {get;set;}
-    	public bool mut {get;set;}
-    	public bool used {get;set;}
+    	public string Name {get;set;}
+    	public bool Mut {get;set;}
+    	public bool Used {get;set;}
     	public VarDecl(string name, Expr expr)
     	{
             if (expr == null)
@@ -113,10 +110,10 @@ namespace CompilerBenchmarker
             if (name == null)
                 throw new ArgumentNullException(nameof(name));
 
-            this.name = name;
-            this.expr = expr;
-            this.mut = false;
-            this.used = false;
+            this.Name = name;
+            this.Expr = expr;
+            this.Mut = false;
+            this.Used = false;
         }
     }
 
@@ -127,7 +124,7 @@ namespace CompilerBenchmarker
             if (expr == null)
                 throw new ArgumentNullException(nameof(expr));
 
-            this.expr = expr;
+            this.Expr = expr;
         }
     }
 
@@ -138,16 +135,16 @@ namespace CompilerBenchmarker
             if (expr == null)
                 throw new ArgumentNullException(nameof(expr));
 
-            this.expr = expr;
+            this.Expr = expr;
         }
     }
 
     class FunDecl : IHasUsed
     {
-    	public string name {get;set;}
-    	public IList<Statement> statements {get;set;}
-    	public string returnType {get;set;}
-        public bool used {get;set;}
+    	public string Name {get;set;}
+    	public IList<Statement> Statements {get;set;}
+    	public string ReturnType {get;set;}
+        public bool Used {get;set;}
     	public FunDecl(string name, IList<Statement> statements, string returnType)
     	{
             if (name == null)
@@ -157,17 +154,17 @@ namespace CompilerBenchmarker
             if (returnType == null)
                 throw new ArgumentNullException(nameof(returnType));
 
-            this.name = name;
-            this.statements = statements;
-            this.returnType = returnType;
-            this.used = false;
+            this.Name = name;
+            this.Statements = statements;
+            this.ReturnType = returnType;
+            this.Used = false;
         }
     }
 
     class Program
     {
-    	public FunDecl main {get;set;}
-    	public IList<FunDecl> functions {get;set;}
+    	public FunDecl Main {get;set;}
+    	public IList<FunDecl> Functions {get;set;}
     	public Program(FunDecl main, IList<FunDecl> functions)
     	{
             if (main == null)
@@ -175,18 +172,18 @@ namespace CompilerBenchmarker
             if (functions == null)
                 throw new ArgumentNullException(nameof(functions));
 
-            this.main = main;
-            this.functions = functions;
+            this.Main = main;
+            this.Functions = functions;
         }
     }
 
     class Context
     {
-    	public Dictionary<string, IHasUsed> env {get;set;} = new Dictionary<string, IHasUsed>();
-    	public int id {get;set;} = 0;
-    	public Context parent {get;set;}
-    	public string declName {get;set;}
-        public Random random {get;set;}
+    	Dictionary<string, IHasUsed> Env {get;set;} = new Dictionary<string, IHasUsed>();
+    	int id {get;set;} = 0;
+    	Context parent {get;set;}
+    	string declName {get;set;}
+        Random random {get;set;}
 
     	public Context(Context parent = null, string declName = null)
     	{
@@ -195,25 +192,25 @@ namespace CompilerBenchmarker
             this.random = new Random();
     	}
 
-        public string name(string prefix, int i)
+        string name(string prefix, int i)
         {
             return $"{prefix}{i}";
     	}
 
-        public string newName(string prefix)
+        string newName(string prefix)
         {
             id += 1;
             return name(prefix, id);
     	}
 
-        public string randomName(string prefix)
+        string randomName(string prefix)
         {
             var biasedMin = random.Next(1, id);
             var i = random.Next(biasedMin, id);
             return name(prefix, i);
     	}
 
-        public Expr randomExpr()
+        Expr randomExpr()
         {
         	switch (random.Next(1, 5))
         	{
@@ -225,23 +222,23 @@ namespace CompilerBenchmarker
             };
     	}
 
-        public IHasUsed findUnused()
+        IHasUsed findUnused()
         {
-            foreach (var decl in env)
+            foreach (var decl in Env)
             {
-                if (!decl.Value.used)
+                if (!decl.Value.Used)
                     return decl.Value;
             }
             return null;
     	}
 
-        public Expr forceUseExpr()
+        Expr forceUseExpr()
         {
             Expr expr = randomConstExpr();
             var decl = findUnused();
             while (decl != null)
             {
-                var left = forcedVarExpr(decl.name);
+                var left = forcedVarExpr(decl.Name);
                 expr = forcedRandomBinaryOp(left, expr);
                 decl = findUnused();
             }
@@ -249,26 +246,26 @@ namespace CompilerBenchmarker
             decl = parent.findUnused();
             while (decl != null)
             {
-                var left = forcedFunCall(decl.name);
+                var left = forcedFunCall(decl.Name);
                 expr = forcedRandomBinaryOp(left, expr);
                 decl = parent.findUnused();
             }
             return expr;
     	}
 
-        public ConstExpr randomConstExpr()
+        ConstExpr randomConstExpr()
         {
             return new ConstExpr(random.Next(1, 1000).ToString());
     	}
 
-        public VarExpr forcedVarExpr(string name)
+        VarExpr forcedVarExpr(string name)
         {
-            var decl = env[name];
-            decl.used = true;
+            var decl = Env[name];
+            decl.Used = true;
             return new VarExpr(name);
     	}
 
-        public Expr randomVarExpr()
+        Expr randomVarExpr()
         {
             if (id == 0)
                 return randomConstExpr();
@@ -276,28 +273,28 @@ namespace CompilerBenchmarker
             return forcedVarExpr(name);
     	}
 
-        public BinOp forcedRandomBinaryOp(Expr left, Expr right)
+        BinOp forcedRandomBinaryOp(Expr left, Expr right)
         {
             //op = random.choice(["+", "-", "*", "|", "&", "^"]);
             var op = random.Choice(new[] {"|", "&", "^"});
             return new BinOp(op, left, right);
     	}
 
-        public BinOp randomBinaryOp()
+        BinOp randomBinaryOp()
         {
             var left = randomExpr();
             var right = randomExpr();
             return forcedRandomBinaryOp(left, right);
     	}
 
-        public FunCallExpr forcedFunCall(string name)
+        FunCallExpr forcedFunCall(string name)
         {
-            var decl = parent.env[name];
-            decl.used = true;
+            var decl = parent.Env[name];
+            decl.Used = true;
             return new FunCallExpr(name);
     	}
 
-        public Expr randomFunCall()
+        Expr randomFunCall()
         {
             if (parent.id == 0)
                 return randomConstExpr();
@@ -305,7 +302,7 @@ namespace CompilerBenchmarker
             return forcedFunCall(name);
     	}
 
-        public Statement randomStatement()
+        Statement randomStatement()
         {
         	switch (random.Next(1, 3))
         	{
@@ -315,42 +312,42 @@ namespace CompilerBenchmarker
         	}
     	}
 
-        public Assignment randomAssignment()
+        Assignment randomAssignment()
         {
             var name = randomName("x");
-            var decl = env[name];
+            var decl = Env[name];
             var expr = randomExpr();
-            if (!decl.used)
+            if (!decl.Used)
             {
                 var left = forcedVarExpr(name);
                 expr = forcedRandomBinaryOp(left, expr);
             }
-            decl.used = false;
+            decl.Used = false;
             if (decl is VarDecl)
-                (decl as VarDecl).mut = true;
+                (decl as VarDecl).Mut = true;
             return new Assignment(name, expr);
     	}
 
-        public Return randomReturnStatement()
+        Return randomReturnStatement()
         {
             return new Return(forceUseExpr());
     	}
 
-        public Print randomPrintStatement()
+        Print randomPrintStatement()
         {
             return new Print(forceUseExpr());
     	}
 
-        public VarDecl randomVarDecl()
+        VarDecl randomVarDecl()
         {
             var expr = randomExpr();
             var name = newName("x");
             var decl = new VarDecl(name, expr);
-            env[name] = decl;
+            Env[name] = decl;
             return decl;
     	}
 
-        public FunDecl randomFunDecl(int numStatements, string returnType)
+        FunDecl randomFunDecl(int numStatements, string returnType)
         {
             var local = new Context(this);
             var statements = new List<Statement>();
@@ -364,11 +361,11 @@ namespace CompilerBenchmarker
             var name = newName("f");
             var decl = new FunDecl(name, statements, returnType);
             // local.decl = decl;
-            env[name] = decl;
+            Env[name] = decl;
             return decl;
     	}
 
-        public Program randomProgram(int numFuns, int maxStatementsPerFun)
+        public Program RandomProgram(int numFuns, int maxStatementsPerFun)
         {
             var functions = new List<FunDecl>();
             int numStatements;
@@ -387,8 +384,8 @@ namespace CompilerBenchmarker
     abstract class Lang
     {
         protected virtual string ext {get;}
-    	public int indent {get;set;} = 0;
-    	public int extraIndent {get;set;} = 0;
+    	protected int indent {get;set;} = 0;
+    	protected int extraIndent {get;set;} = 0;
 
         protected virtual Dictionary<string, string> operators => new Dictionary<string, string> {
             {"&", "&"},
@@ -466,7 +463,7 @@ namespace CompilerBenchmarker
             if (expr == null)
                 throw new ArgumentNullException(nameof(expr));
 
-            f.Write(expr.val);
+            f.Write(expr.Val);
     	}
 
         protected virtual void writeVarExpr(StreamWriter f, VarExpr expr, bool needsParens)
@@ -474,7 +471,7 @@ namespace CompilerBenchmarker
             if (expr == null)
                 throw new ArgumentNullException(nameof(expr));
 
-            f.Write(expr.name);
+            f.Write(expr.Name);
     	}
 
         protected virtual void writeBinOp(StreamWriter f, BinOp expr, bool needsParens)
@@ -484,9 +481,9 @@ namespace CompilerBenchmarker
 
             if (needsParens)
                 f.Write("(");
-            writeExpr(f, expr.left, needsParens);
-            f.Write($" {operators[expr.op]} ");
-            writeExpr(f, expr.right, needsParens);
+            writeExpr(f, expr.Left, needsParens);
+            f.Write($" {operators[expr.Op]} ");
+            writeExpr(f, expr.Right, needsParens);
             if (needsParens)
                 f.Write(")");
     	}
@@ -496,7 +493,7 @@ namespace CompilerBenchmarker
             if (expr == null)
                 throw new ArgumentNullException(nameof(expr));
 
-            f.Write($"{expr.name}()");
+            f.Write($"{expr.Name}()");
         }
     }
 
@@ -514,10 +511,12 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(program));
 
             f.Write("#include <cstdio>\n\n");
-            foreach (var funDecl in program.functions)
+            foreach (var funDecl in program.Functions)
+            {
                 writeFunDecl(f, funDecl);
                 f.Write("\n");
-            writeFunDecl(f, program.main, true);
+            }
+            writeFunDecl(f, program.Main, true);
     	}
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
@@ -526,17 +525,19 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(funDecl));
 
             string optionalResult, typeName;
-            if (funDecl.returnType == "")
+            if (funDecl.ReturnType == "")
+            {
                 optionalResult = "int ";
+            }
             else
             {
-                typeNames.TryGetValue(funDecl.returnType, out typeName);
+                typeNames.TryGetValue(funDecl.ReturnType, out typeName);
                 optionalResult = $"{typeName} ";
             }
-            var funName = main ? "main" : funDecl.name;
+            var funName = main ? "main" : funDecl.Name;
             f.Write($"{optionalResult} {funName}() {{\n");
             indent += 1;
-            foreach (var statement in funDecl.statements)
+            foreach (var statement in funDecl.Statements)
                 writeStatement(f, statement);
             indent -= 1;
             f.Write("}\n");
@@ -549,9 +550,9 @@ namespace CompilerBenchmarker
 
             writeIndent(f);
             f.Write("int ");
-            writeLval(f, varDecl.name);
+            writeLval(f, varDecl.Name);
             f.Write(" = ");
-            writeExpr(f, varDecl.expr);
+            writeExpr(f, varDecl.Expr);
             f.Write(";\n");
     	}
 
@@ -561,9 +562,9 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(assignment));
 
             writeIndent(f);
-            writeLval(f, assignment.lval);
+            writeLval(f, assignment.Lval);
             f.Write(" = ");
-            writeExpr(f, assignment.expr);
+            writeExpr(f, assignment.Expr);
             f.Write(";\n");
     	}
 
@@ -574,7 +575,7 @@ namespace CompilerBenchmarker
 
             writeIndent(f);
             f.Write("return ");
-            writeExpr(f, statement.expr);
+            writeExpr(f, statement.Expr);
             f.Write(";\n");
     	}
 
@@ -585,7 +586,7 @@ namespace CompilerBenchmarker
 
             writeIndent(f);
             f.Write("printf(\"%i\\n\", ");
-            writeExpr(f, statement.expr);
+            writeExpr(f, statement.Expr);
             f.Write(");\n");
         }
     }
@@ -600,12 +601,12 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(program));
 
             f.Write("#include <stdio.h>\n\n");
-            foreach (var funDecl in program.functions)
+            foreach (var funDecl in program.Functions)
             {
                 writeFunDecl(f, funDecl);
                 f.Write("\n");
             }
-            writeFunDecl(f, program.main, true);
+            writeFunDecl(f, program.Main, true);
         }
     }
 
@@ -623,10 +624,12 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(program));
 
             f.Write("import std.stdio;\n\n");
-            foreach (var funDecl in program.functions)
+            foreach (var funDecl in program.Functions)
+            {
                 writeFunDecl(f, funDecl);
                 f.Write("\n");
-            writeFunDecl(f, program.main, true);
+            }
+            writeFunDecl(f, program.Main, true);
     	}
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
@@ -635,17 +638,19 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(funDecl));
 
             string optionalResult, typeName;
-            if (funDecl.returnType == "")
+            if (funDecl.ReturnType == "")
+            {
                 optionalResult = "void ";
+            }
             else
             {
-                typeNames.TryGetValue(funDecl.returnType, out typeName);
+                typeNames.TryGetValue(funDecl.ReturnType, out typeName);
                 optionalResult = $"{typeName} ";
             }
-            var funName = main ? "main" : funDecl.name;
+            var funName = main ? "main" : funDecl.Name;
             f.Write($"{optionalResult} {funName}() {{\n");
             indent += 1;
-            foreach (var statement in funDecl.statements)
+            foreach (var statement in funDecl.Statements)
                 writeStatement(f, statement);
             indent -= 1;
             f.Write("}\n");
@@ -658,9 +663,9 @@ namespace CompilerBenchmarker
 
             writeIndent(f);
             f.Write("int ");
-            writeLval(f, varDecl.name);
+            writeLval(f, varDecl.Name);
             f.Write(" = ");
-            writeExpr(f, varDecl.expr);
+            writeExpr(f, varDecl.Expr);
             f.Write(";\n");
     	}
 
@@ -670,9 +675,9 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(assignment));
 
             writeIndent(f);
-            writeLval(f, assignment.lval);
+            writeLval(f, assignment.Lval);
             f.Write(" = ");
-            writeExpr(f, assignment.expr);
+            writeExpr(f, assignment.Expr);
             f.Write(";\n");
     	}
 
@@ -683,7 +688,7 @@ namespace CompilerBenchmarker
 
             writeIndent(f);
             f.Write("return ");
-            writeExpr(f, statement.expr);
+            writeExpr(f, statement.Expr);
             f.Write(";\n");
     	}
 
@@ -694,7 +699,7 @@ namespace CompilerBenchmarker
 
             writeIndent(f);
             f.Write("writefln(\"%d\", ");
-            writeExpr(f, statement.expr);
+            writeExpr(f, statement.Expr);
             f.Write(");\n");
         }
     }
@@ -714,12 +719,12 @@ namespace CompilerBenchmarker
 
             f.Write("package main\n\n");
             f.Write("import \"fmt\"\n\n");
-            foreach (var funDecl in program.functions)
+            foreach (var funDecl in program.Functions)
             {
                 writeFunDecl(f, funDecl);
                 f.Write("\n");
             }
-            writeFunDecl(f, program.main, true);
+            writeFunDecl(f, program.Main, true);
     	}
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
@@ -728,17 +733,19 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(funDecl));
 
             string optionalResult, typeName;
-            if (funDecl.returnType == "")
+            if (funDecl.ReturnType == "")
+            {
                 optionalResult = "";
+            }
             else
             {
-                typeNames.TryGetValue(funDecl.returnType, out typeName);
+                typeNames.TryGetValue(funDecl.ReturnType, out typeName);
                 optionalResult = " " + typeName;
             }
-            var funName = main ? "main" : funDecl.name;
+            var funName = main ? "main" : funDecl.Name;
             f.Write($"func {funName}(){optionalResult} {{\n");
             indent += 1;
-            foreach (var statement in funDecl.statements)
+            foreach (var statement in funDecl.Statements)
                 writeStatement(f, statement);
             indent -= 1;
             f.Write("}\n");
@@ -750,9 +757,9 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(varDecl));
 
             writeIndent(f);
-            writeLval(f, varDecl.name);
+            writeLval(f, varDecl.Name);
             f.Write(" := ");
-            writeExpr(f, varDecl.expr);
+            writeExpr(f, varDecl.Expr);
             f.Write("\n");
     	}
 
@@ -762,9 +769,9 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(assignment));
 
             writeIndent(f);
-            writeLval(f, assignment.lval);
+            writeLval(f, assignment.Lval);
             f.Write(" = ");
-            writeExpr(f, assignment.expr);
+            writeExpr(f, assignment.Expr);
             f.Write("\n");
     	}
 
@@ -775,7 +782,7 @@ namespace CompilerBenchmarker
 
             writeIndent(f);
             f.Write("return ");
-            writeExpr(f, statement.expr);
+            writeExpr(f, statement.Expr);
             f.Write("\n");
     	}
 
@@ -786,7 +793,7 @@ namespace CompilerBenchmarker
 
             writeIndent(f);
             f.Write("fmt.Printf(\"%d\\n\", ");
-            writeExpr(f, statement.expr);
+            writeExpr(f, statement.Expr);
             f.Write(")\n");
         }
     }
@@ -811,12 +818,12 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(program));
 
             f.Write("program main;\n\n");
-            foreach (var funDecl in program.functions)
+            foreach (var funDecl in program.Functions)
             {
                 writeFunDecl(f, funDecl);
                 f.Write("\n");
             }
-            writeFunDecl(f, program.main, true);
+            writeFunDecl(f, program.Main, true);
     	}
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
@@ -828,23 +835,23 @@ namespace CompilerBenchmarker
             string typeName;
             if (!main)
             {
-                funName = funDecl.name;
-                typeNames.TryGetValue(funDecl.returnType, out typeName);
+                funName = funDecl.Name;
+                typeNames.TryGetValue(funDecl.ReturnType, out typeName);
                 f.Write($"function {funName}() : {typeName};\n");
             }
-            var vars = funDecl.statements.OfType<VarDecl>();
+            var vars = funDecl.Statements.OfType<VarDecl>();
             if (vars != null && vars.Any())
             {
                 f.Write("var\n");
                 foreach (var v in vars)
                 {
                     typeName = typeNames["int"];
-                    f.Write($"  {v.name} : {typeName};\n");
+                    f.Write($"  {v.Name} : {typeName};\n");
                 }
             }
             f.Write("begin\n");
             indent += 1;
-            foreach (var statement in funDecl.statements)
+            foreach (var statement in funDecl.Statements)
                 writeStatement(f, statement);
             indent -= 1;
             f.Write("end{(main ? '.' : ';')}\n");
@@ -856,9 +863,9 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(varDecl));
 
             writeIndent(f);
-            writeLval(f, varDecl.name);
+            writeLval(f, varDecl.Name);
             f.Write(" := ");
-            writeExpr(f, varDecl.expr);
+            writeExpr(f, varDecl.Expr);
             f.Write(";\n");
     	}
 
@@ -868,9 +875,9 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(assignment));
 
             writeIndent(f);
-            writeLval(f, assignment.lval);
+            writeLval(f, assignment.Lval);
             f.Write(" := ");
-            writeExpr(f, assignment.expr);
+            writeExpr(f, assignment.Expr);
             f.Write(";\n");
     	}
 
@@ -880,9 +887,9 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(statement));
 
             writeIndent(f);
-            writeLval(f, statement.expr.name);
+            writeLval(f, statement.Expr.Name);
             f.Write(" := ");
-            writeExpr(f, statement.expr);
+            writeExpr(f, statement.Expr);
             f.Write(";\n");
     	}
 
@@ -893,7 +900,7 @@ namespace CompilerBenchmarker
 
             writeIndent(f);
             f.Write("writeln(");
-            writeExpr(f, statement.expr);
+            writeExpr(f, statement.Expr);
             f.Write(");\n");
         }
     }
@@ -912,12 +919,12 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(program));
 
             f.Write("#![allow(unusedParens)]\n\n");
-            foreach (var funDecl in program.functions)
+            foreach (var funDecl in program.Functions)
             {
                 writeFunDecl(f, funDecl);
                 f.Write("\n");
             }
-            writeFunDecl(f, program.main, true);
+            writeFunDecl(f, program.Main, true);
     	}
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
@@ -927,17 +934,19 @@ namespace CompilerBenchmarker
 
             string optionalResult;
             string funName, typeName;
-            if (funDecl.returnType == "")
+            if (funDecl.ReturnType == "")
+            {
                 optionalResult = "";
+            }
             else
             {
-                typeNames.TryGetValue(funDecl.returnType, out typeName);
+                typeNames.TryGetValue(funDecl.ReturnType, out typeName);
                 optionalResult = $" -> {typeName}";
             }
-            funName = main ? "main" : funDecl.name;
+            funName = main ? "main" : funDecl.Name;
             f.Write($"fn {funName}(){optionalResult} {{\n");
             indent += 1;
-            foreach (var statement in funDecl.statements)
+            foreach (var statement in funDecl.Statements)
                 writeStatement(f, statement);
             indent -= 1;
             f.Write("}\n");
@@ -950,12 +959,12 @@ namespace CompilerBenchmarker
 
             writeIndent(f);
             f.Write("let ");
-            if (varDecl.mut)
+            if (varDecl.Mut)
                 f.Write("mut ");
-            writeLval(f, varDecl.name);
+            writeLval(f, varDecl.Name);
             f.Write(": i32");
             f.Write(" = ");
-            writeExpr(f, varDecl.expr);
+            writeExpr(f, varDecl.Expr);
             f.Write(";\n");
     	}
 
@@ -965,9 +974,9 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(assignment));
 
             writeIndent(f);
-            writeLval(f, assignment.lval);
+            writeLval(f, assignment.Lval);
             f.Write(" = ");
-            writeExpr(f, assignment.expr);
+            writeExpr(f, assignment.Expr);
             f.Write(";\n");
     	}
 
@@ -977,7 +986,7 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(statement));
 
             writeIndent(f);
-            writeExpr(f, statement.expr);
+            writeExpr(f, statement.Expr);
             f.Write("\n");
     	}
 
@@ -988,7 +997,7 @@ namespace CompilerBenchmarker
 
             writeIndent(f);
             f.Write("println!(\"{}\", ");
-            writeExpr(f, statement.expr);
+            writeExpr(f, statement.Expr);
             f.Write(")\n");
         }
     }
@@ -1012,12 +1021,12 @@ namespace CompilerBenchmarker
             if (program == null)
                 throw new ArgumentNullException(nameof(program));
 
-            foreach (var funDecl in program.functions)
+            foreach (var funDecl in program.Functions)
             {
                 writeFunDecl(f, funDecl);
                 f.Write("\n");
             }
-            writeFunDecl(f, program.main, true);
+            writeFunDecl(f, program.Main, true);
     	}
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
@@ -1026,17 +1035,19 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(funDecl));
 
             string optionalResult, typeName;
-            if (funDecl.returnType == "")
+            if (funDecl.ReturnType == "")
+            {
                 optionalResult = "";
+            }
             else
             {
-                typeNames.TryGetValue(funDecl.returnType, out typeName);
+                typeNames.TryGetValue(funDecl.ReturnType, out typeName);
                 optionalResult = $":{typeName} ";
             }
-            var funName = main ? "main" : funDecl.name;
+            var funName = main ? "main" : funDecl.Name;
             f.Write($"let {funName} (){optionalResult} = \n");
             indent += 1;
-            foreach (var statement in funDecl.statements)
+            foreach (var statement in funDecl.Statements)
                 writeStatement(f, statement);
             indent -= 1;
             if (main)
@@ -1050,9 +1061,9 @@ namespace CompilerBenchmarker
 
             writeIndent(f);
             f.Write("let ");
-            writeLval(f, varDecl.name);
+            writeLval(f, varDecl.Name);
             f.Write(" = ");
-            writeExpr(f, varDecl.expr);
+            writeExpr(f, varDecl.Expr);
             f.Write(" in \n");
     	}
 
@@ -1063,9 +1074,9 @@ namespace CompilerBenchmarker
 
             writeIndent(f);
             f.Write("let ");
-            writeLval(f, assignment.lval);
+            writeLval(f, assignment.Lval);
             f.Write(" = ");
-            writeExpr(f, assignment.expr);
+            writeExpr(f, assignment.Expr);
             f.Write(" in \n");
     	}
 
@@ -1075,7 +1086,7 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(statement));
 
             writeIndent(f);
-            writeExpr(f, statement.expr);
+            writeExpr(f, statement.Expr);
             f.Write("\n");
     	}
 
@@ -1086,7 +1097,7 @@ namespace CompilerBenchmarker
 
             writeIndent(f);
             f.Write("Printf.printf \"%i\\n\" (");
-            writeExpr(f, statement.expr);
+            writeExpr(f, statement.Expr);
             f.Write(");;\n");
         }
     }
@@ -1110,12 +1121,12 @@ namespace CompilerBenchmarker
             if (program == null)
                 throw new ArgumentNullException(nameof(program));
 
-            foreach (var funDecl in program.functions)
+            foreach (var funDecl in program.Functions)
             {
                 writeFunDecl(f, funDecl);
                 f.Write("\n");
             }
-            writeFunDecl(f, program.main, true);
+            writeFunDecl(f, program.Main, true);
     	}
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
@@ -1124,17 +1135,19 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(funDecl));
 
             string optionalResult, typeName;
-            if (funDecl.returnType == "")
+            if (funDecl.ReturnType == "")
+            {
                 optionalResult = "";
+            }
             else
             {
-                typeNames.TryGetValue(funDecl.returnType, out typeName);
+                typeNames.TryGetValue(funDecl.ReturnType, out typeName);
                 optionalResult = ":" + typeName + " ";
             }
-            var funName = main ? "main" : funDecl.name;
+            var funName = main ? "main" : funDecl.Name;
             f.Write($"let {funName} (){optionalResult} = \n");
             indent += 1;
-            foreach (var statement in funDecl.statements)
+            foreach (var statement in funDecl.Statements)
                 writeStatement(f, statement);
             indent -= 1;
             if (main)
@@ -1148,9 +1161,9 @@ namespace CompilerBenchmarker
 
             writeIndent(f);
             f.Write("let ");
-            writeLval(f, varDecl.name);
+            writeLval(f, varDecl.Name);
             f.Write(" = ");
-            writeExpr(f, varDecl.expr);
+            writeExpr(f, varDecl.Expr);
             f.Write(" in \n");
     	}
 
@@ -1161,9 +1174,9 @@ namespace CompilerBenchmarker
 
             writeIndent(f);
             f.Write("let ");
-            writeLval(f, assignment.lval);
+            writeLval(f, assignment.Lval);
             f.Write(" = ");
-            writeExpr(f, assignment.expr);
+            writeExpr(f, assignment.Expr);
             f.Write(" in \n");
     	}
 
@@ -1173,7 +1186,7 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(statement));
 
             writeIndent(f);
-            writeExpr(f, statement.expr);
+            writeExpr(f, statement.Expr);
             f.Write("\n");
     	}
 
@@ -1184,7 +1197,7 @@ namespace CompilerBenchmarker
 
             writeIndent(f);
             f.Write("printfn \"%i\\n\" (");
-            writeExpr(f, statement.expr);
+            writeExpr(f, statement.Expr);
             f.Write(");;\n");
         }
 
@@ -1219,12 +1232,12 @@ namespace CompilerBenchmarker
                     + "a ||| b = a .|. b\n"
                     + "(^^^) :: Int32 -> Int32 -> Int32\n"
                     + "a ^^^ b = a `xor` b\n\n");
-            foreach (var funDecl in program.functions)
+            foreach (var funDecl in program.Functions)
             {
                 writeFunDecl(f, funDecl);
                 f.Write("\n");
             }
-            writeFunDecl(f, program.main, true);
+            writeFunDecl(f, program.Main, true);
     	}
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
@@ -1241,15 +1254,15 @@ namespace CompilerBenchmarker
             }
             else
             {
-                fund = $"{funDecl.name} = ";
-                f.Write(funDecl.name + " :: Int32\n");
+                fund = $"{funDecl.Name} = ";
+                f.Write(funDecl.Name + " :: Int32\n");
                 f.Write(fund);
             }
 
-            if (funDecl.statements.Count > 0)
-                writeStatement(f, funDecl.statements[0]);
+            if (funDecl.Statements.Count > 0)
+                writeStatement(f, funDecl.Statements[0]);
             extraIndent = fund.Length;
-            foreach (var statement in funDecl.statements.Skip(1))
+            foreach (var statement in funDecl.Statements.Skip(1))
                 writeStatement(f, statement);
             extraIndent = 0;
     	}
@@ -1261,9 +1274,9 @@ namespace CompilerBenchmarker
 
             writeIndent(f);
             f.Write("let ");
-            writeLval(f, varDecl.name);
+            writeLval(f, varDecl.Name);
             f.Write(" = ");
-            writeExpr(f, varDecl.expr);
+            writeExpr(f, varDecl.Expr);
             f.Write(" in \n");
     	}
 
@@ -1272,14 +1285,14 @@ namespace CompilerBenchmarker
             if (assignment == null)
                 throw new ArgumentNullException(nameof(assignment));
 
-            if (assignment.expr is VarExpr && assignment.lval == assignment.expr.name)
+            if (assignment.Expr is VarExpr && assignment.Lval == assignment.Expr.Name)
                 return;
 
             writeIndent(f);
             f.Write("let ");
-            writeLval(f, assignment.lval);
+            writeLval(f, assignment.Lval);
             f.Write(" = ");
-            writeExpr(f, assignment.expr);
+            writeExpr(f, assignment.Expr);
             f.Write(" in \n");
     	}
 
@@ -1289,7 +1302,7 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(statement));
 
             writeIndent(f);
-            writeExpr(f, statement.expr);
+            writeExpr(f, statement.Expr);
             f.Write("\n");
     	}
 
@@ -1300,13 +1313,13 @@ namespace CompilerBenchmarker
 
             writeIndent(f);
             f.Write("printf \"%i\\n\" (");
-            writeExpr(f, statement.expr);
+            writeExpr(f, statement.Expr);
             f.Write(")\n");
     	}
 
         protected override void writeFunCall(StreamWriter f, FunCallExpr expr, bool needsParens)
         {
-            f.Write(expr.name);
+            f.Write(expr.Name);
         }
     }
 
@@ -1326,12 +1339,12 @@ namespace CompilerBenchmarker
     	    writeIndent(f);
             f.Write("{\n");
             indent += 1;
-            foreach (var funDecl in program.functions)
+            foreach (var funDecl in program.Functions)
             {
                 writeFunDecl(f, funDecl);
                 f.Write("\n");
             }
-            writeFunDecl(f, program.main, true);
+            writeFunDecl(f, program.Main, true);
             f.Write("\n");
             indent -= 1;
             writeIndent(f);
@@ -1346,20 +1359,22 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(funDecl));
 
             string optionalResult, typeName;
-            if (funDecl.returnType == "")
+            if (funDecl.ReturnType == "")
+            {
                 optionalResult = "static int";
+            }
             else
             {
-                typeNames.TryGetValue(funDecl.returnType, out typeName);
+                typeNames.TryGetValue(funDecl.ReturnType, out typeName);
                 optionalResult = "static " + typeName;
             }
-            var funName = main ? "Main" : funDecl.name;
+            var funName = main ? "Main" : funDecl.Name;
             writeIndent(f);
             f.Write($"{optionalResult} {funName}()\n");
             writeIndent(f);
             f.Write("{\n");
             indent += 1;
-            foreach (var statement in funDecl.statements)
+            foreach (var statement in funDecl.Statements)
                 writeStatement(f, statement);
             if (main)
             {
@@ -1378,7 +1393,7 @@ namespace CompilerBenchmarker
 
             writeIndent(f);
             f.Write("Console.WriteLine(\"{i}\\n\", ");
-            writeExpr(f, statement.expr);
+            writeExpr(f, statement.Expr);
             f.Write(");\n");
         }
     }
@@ -1398,12 +1413,12 @@ namespace CompilerBenchmarker
             writeIndent(f);
             f.Write("{\n");
             indent += 1;
-            foreach (var funDecl in program.functions)
+            foreach (var funDecl in program.Functions)
             {
                 writeFunDecl(f, funDecl);
                 f.Write("\n");
             }
-            writeFunDecl(f, program.main, true);
+            writeFunDecl(f, program.Main, true);
             f.Write("\n");
             indent -= 1;
             writeIndent(f);
@@ -1417,7 +1432,7 @@ namespace CompilerBenchmarker
 
             writeIndent(f);
             f.Write("System.out.format(\"%d\\n\", ");
-            writeExpr(f, statement.expr);
+            writeExpr(f, statement.Expr);
             f.Write(");\n");
         }
     }
@@ -1441,12 +1456,12 @@ namespace CompilerBenchmarker
             if (program == null)
                 throw new ArgumentNullException(nameof(program));
 
-            foreach (var funDecl in program.functions)
+            foreach (var funDecl in program.Functions)
             {
                 writeFunDecl(f, funDecl);
                 f.Write("\n");
             }
-            writeFunDecl(f, program.main, true);
+            writeFunDecl(f, program.Main, true);
     	}
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
@@ -1455,17 +1470,19 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(funDecl));
 
             string optionalResult, typeName;
-            if (funDecl.returnType == "")
+            if (funDecl.ReturnType == "")
+            {
                 optionalResult = "";
+            }
             else
             {
-                typeNames.TryGetValue(funDecl.returnType, out typeName);
+                typeNames.TryGetValue(funDecl.ReturnType, out typeName);
                 optionalResult = ": " + typeName;
             }
-            var funName = main ? "main" : funDecl.name;
+            var funName = main ? "main" : funDecl.Name;
             f.Write($"fun {funName}(){optionalResult} {{\n");
             indent += 1;
-            foreach (var statement in funDecl.statements)
+            foreach (var statement in funDecl.Statements)
                 writeStatement(f, statement);
             indent -= 1;
             f.Write("}\n");
@@ -1477,20 +1494,20 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(varDecl));
 
             writeIndent(f);
-            if (varDecl.mut)
+            if (varDecl.Mut)
                 f.Write("var ");
             else
                 f.Write("val ");
-            writeLval(f, varDecl.name);
+            writeLval(f, varDecl.Name);
             f.Write(": Int");
             f.Write(" = ");
-            writeExpr(f, varDecl.expr);
+            writeExpr(f, varDecl.Expr);
             f.Write("\n");
     	}
 
         protected override void writeConstExpr(StreamWriter f, ConstExpr expr, bool needsParens)
         {
-            f.Write(expr.val);
+            f.Write(expr.Val);
     	}
 
         protected override void writeAssignment(StreamWriter f, Assignment assignment)
@@ -1499,9 +1516,9 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(assignment));
 
             writeIndent(f);
-            writeLval(f, assignment.lval);
+            writeLval(f, assignment.Lval);
             f.Write(" = ");
-            writeExpr(f, assignment.expr);
+            writeExpr(f, assignment.Expr);
             f.Write("\n");
     	}
 
@@ -1512,7 +1529,7 @@ namespace CompilerBenchmarker
 
             writeIndent(f);
             f.Write("return ");
-            writeExpr(f, statement.expr);
+            writeExpr(f, statement.Expr);
             f.Write("\n");
     	}
 
@@ -1523,7 +1540,7 @@ namespace CompilerBenchmarker
 
             writeIndent(f);
             f.Write("print(");
-            writeExpr(f, statement.expr);
+            writeExpr(f, statement.Expr);
             f.Write(")\n");
         }
     }
@@ -1547,13 +1564,13 @@ namespace CompilerBenchmarker
             writeIndent(f);
             f.Write("\n");
             indent += 1;
-            foreach (var funDecl in program.functions)
+            foreach (var funDecl in program.Functions)
             {
                 writeIndent(f);
                 writeFunDecl(f, funDecl);
                 f.Write("\n");
             }
-            writeFunDecl(f, program.main, true);
+            writeFunDecl(f, program.Main, true);
             indent -= 1;
             f.Write("}");
         }
@@ -1564,17 +1581,17 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(funDecl));
 
             string optionalResult, typeName;
-            if (funDecl.returnType == "")
+            if (funDecl.ReturnType == "")
                 optionalResult = "";
             else
             {
-                typeNames.TryGetValue(funDecl.returnType, out typeName);
+                typeNames.TryGetValue(funDecl.ReturnType, out typeName);
                 optionalResult = ": " + typeName;
             }
-            var funName = main ? "main" : funDecl.name;
+            var funName = main ? "main" : funDecl.Name;
             f.Write($"def {funName}(){optionalResult} = {{\n");
             indent += 1;
-            foreach (var statement in funDecl.statements)
+            foreach (var statement in funDecl.Statements)
                 writeStatement(f, statement);
             indent -= 1;
             f.Write("}\n");
@@ -1586,7 +1603,7 @@ namespace CompilerBenchmarker
 
     public class CodeGen
     {
-        private Lang GetLang(string lang)
+        Lang GetLang(string lang)
         {
             switch (lang.ToLower())
             {
@@ -1619,7 +1636,7 @@ namespace CompilerBenchmarker
             using (var f = new StreamWriter(filename))
             {
                 langwriter.WriteProgram(f,
-                    new Context().randomProgram(
+                    new Context().RandomProgram(
                         numFuns: numFuns, maxStatementsPerFun: 20));
             }
         }
