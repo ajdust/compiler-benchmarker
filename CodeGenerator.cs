@@ -1579,7 +1579,9 @@ namespace CompilerBenchmarker
 
             string optionalResult, typeName;
             if (funDecl.ReturnType == "")
+            {
                 optionalResult = "";
+            }
             else
             {
                 typeNames.TryGetValue(funDecl.ReturnType, out typeName);
