@@ -143,6 +143,7 @@ namespace CompilerBenchmarker
 		static IEnumerable<CompilerBenchmark> RunBenchmarks(
 			List<Compiler> compilers, int numberAtStart, int numberOfSteps, int increaseOnStep)
 		{
+			var codeGen = new CodeGen();
 			foreach (var langCompilers in compilers.GroupBy(x => x.Language))
 			{
 				Console.WriteLine($"Benchmarking {langCompilers.Key}:");
@@ -160,7 +161,7 @@ namespace CompilerBenchmarker
 		            }
 		            else
 		            {
-						new CodeGen().WriteLang(langCompilers.Key, numFun, codeFilePath);
+						codeGen.WriteLang(langCompilers.Key, numFun, codeFilePath);
 		            }
 	            	Console.WriteLine();
 
@@ -212,8 +213,8 @@ namespace CompilerBenchmarker
 
 		static void Main(string[] args)
 		{
-			int numberAtStart = 5000;
-			int numberOfSteps = 10;
+			int numberAtStart = 20;
+			int numberOfSteps = 1;
 			int stepIncreaseNumber = 5000;
 
 			// todo: good command-line options library for C#?
@@ -247,8 +248,8 @@ namespace CompilerBenchmarker
 				new Compiler("CSharp", "cs", "csc", "/o"),
 				new Compiler("FSharp", "fs", "fsharpc", "-O"),
 				// new Compiler("Java", "java", "javac", "-J-Xmx4096M", "-J-Xms64M"),
-				new Compiler("Scala", "scala", "scalac", "-optimize"), // modified to use Java -Xmx4096M -Xms64M -Xss4m
-				new Compiler("Scala", "scala", "dotc", "-optimize"), // modified to use Java -Xmx4096M -Xss4m
+				new Compiler("Scala", "scala", "scalac", "-optimise"), // modified to use Java -Xmx4096M -Xms64M -Xss4m
+				new Compiler("Scala", "scala", "dotc", "-optimise"), // modified to use Java -Xmx4096M -Xss4m
 				new Compiler("Kotlin", "kt", "kotlinc"), // modified to use Java -Xmx4096M -Xms64M -Xss4m
 			};
 			// todo: verify compilers exist on system

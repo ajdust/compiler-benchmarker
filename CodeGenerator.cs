@@ -182,14 +182,12 @@ namespace CompilerBenchmarker
     	Dictionary<string, IHasUsed> Env {get;set;} = new Dictionary<string, IHasUsed>();
     	int id {get;set;} = 0;
     	Context parent {get;set;}
-    	string declName {get;set;}
         Random random {get;set;}
 
-    	public Context(Context parent = null, string declName = null)
+    	public Context(Context parent, Random random)
     	{
             this.parent = parent;
-            this.declName = declName;
-            this.random = new Random();
+            this.random = random;
     	}
 
         string name(string prefix, int i)
@@ -349,7 +347,7 @@ namespace CompilerBenchmarker
 
         FunDecl randomFunDecl(int numStatements, string returnType)
         {
-            var local = new Context(this);
+            var local = new Context(this, this.random);
             var statements = new List<Statement>();
             statements.Add(local.randomVarDecl());
             foreach (var i in Enumerable.Range(0, numStatements))
@@ -360,7 +358,6 @@ namespace CompilerBenchmarker
                 statements.Add(local.randomPrintStatement());
             var name = newName("f");
             var decl = new FunDecl(name, statements, returnType);
-            // local.decl = decl;
             Env[name] = decl;
             return decl;
     	}
@@ -1594,6 +1591,7 @@ namespace CompilerBenchmarker
             foreach (var statement in funDecl.Statements)
                 writeStatement(f, statement);
             indent -= 1;
+            writeIndent(f);
             f.Write("}\n");
         }
     }
@@ -1603,6 +1601,8 @@ namespace CompilerBenchmarker
 
     public class CodeGen
     {
+        int randomSeed { get; set; } = Convert.ToInt32(new Random().NextDouble() * 100000);
+
         Lang GetLang(string lang)
         {
             switch (lang.ToLower())
@@ -1636,7 +1636,7 @@ namespace CompilerBenchmarker
             using (var f = new StreamWriter(filename))
             {
                 langwriter.WriteProgram(f,
-                    new Context().RandomProgram(
+                    new Context(null, new Random(randomSeed)).RandomProgram(
                         numFuns: numFuns, maxStatementsPerFun: 20));
             }
         }
