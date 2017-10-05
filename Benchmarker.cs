@@ -12,12 +12,10 @@ namespace CompilerBenchmarker
 	static class StringExtensions
 	{
 		public static string Join(this IEnumerable<string> s, string delimiter)
-		{
-			return string.Join(delimiter, s);
-		}
+			=> string.Join(delimiter, s);
 	}
 
-	class CompilerExeComparer : IComparer<Compiler>, IEqualityComparer<Compiler>
+	class CompilerComparer : IComparer<Compiler>, IEqualityComparer<Compiler>
 	{
 		public int Compare(Compiler left, Compiler right)
 		{
@@ -34,9 +32,7 @@ namespace CompilerBenchmarker
 		}
 
 		public bool Equals(Compiler left, Compiler right)
-		{
-			return Compare(left, right) == 0;
-		}
+			=> Compare(left, right) == 0;
 
 		public int GetHashCode(Compiler c)
 		{
@@ -49,13 +45,13 @@ namespace CompilerBenchmarker
 	struct Compiler
 	{
 		// The name of the language, e.g. "C"
-		public string Language { get; set; }
+		public string Language;
 		// The extension of the files in this language, e.g. "c"
-		public string Extension { get; set; }
+		public string Extension;
 		// The compiler executable, e.g. "gcc"
-		public string Exe { get; set; }
+		public string Exe;
 		// The arguments to the compiler executabe, e.g. "-O"
-		public string[] Arguments { get; set; }
+		public string[] Arguments;
 
 		public Compiler(string language, string extension, string exe, params string[] arguments)
 		{
@@ -88,7 +84,8 @@ namespace CompilerBenchmarker
 		public TimeSpan TimeToCompile;
 		public bool Compiled;
 		public int NumberFunctions;
-		public string SecondsToCompile => Compiled ? TimeToCompile.TotalSeconds.ToString() : "";
+		public string SecondsToCompile
+			=> Compiled ? TimeToCompile.TotalSeconds.ToString() : "";
 
 		public static CompilerBenchmark Success(Compiler compiler, TimeSpan timeToCompile, int numberFunctions)
 		{
@@ -98,9 +95,7 @@ namespace CompilerBenchmarker
 		}
 
 		public static CompilerBenchmark Failure(Compiler compiler, int numberFunctions)
-		{
-			return new CompilerBenchmark(compiler, TimeSpan.Zero, numberFunctions, false);
-		}
+			=> new CompilerBenchmark(compiler, TimeSpan.Zero, numberFunctions, false);
 
 		private CompilerBenchmark(Compiler compiler, TimeSpan timeToCompile, int numberFunctions, bool compiled)
 		{
@@ -122,15 +117,17 @@ namespace CompilerBenchmarker
 			watch.Start();
 			var args = string.Join(" ", compiler.Arguments.Concat(new[] { codeFilePath }));
 			Console.WriteLine($"  - Running with {numFun}: {compiler.Exe} {args}");
-			var p = Process.Start(compiler.Exe, args);
-			// todo: pass in compiler timeout option
-			p.WaitForExit();
-			if (p.ExitCode != 0)
+			using (var p = Process.Start(compiler.Exe, args))
 			{
-				watch.Stop();
-				Console.WriteLine($"  ! Compilation failed for '{compiler.Exe} {args}'");
-				Thread.Sleep(2500);
-				return null;
+				// todo: pass in compiler timeout option
+				p.WaitForExit();
+				if (p.ExitCode != 0)
+				{
+					watch.Stop();
+					Console.WriteLine($"  ! Compilation failed for '{compiler.Exe} {args}'");
+					Thread.Sleep(2500);
+					return null;
+				}
 			}
 
 			// todo: also track memory consumption
@@ -153,7 +150,7 @@ namespace CompilerBenchmarker
 				{
 					// generate file
 					Console.Write($"- Generating {langCompilers.Key} with {numFun} functions.. ");
-					// todo: option to force-make already made files
+					// todo: don't use existing files by default, just have the option to
 		            var codeFilePath = $"test_{numFun}.{langCompilers.First().Extension}";
 		            if (File.Exists(codeFilePath))
 		            {
@@ -185,7 +182,7 @@ namespace CompilerBenchmarker
 			IEnumerable<CompilerBenchmark> marks,
 			string resultFileName)
 		{
-			var compilerComp = new CompilerExeComparer();
+			var compilerComp = new CompilerComparer();
 
 			// [Number of Functions -> { Compiler -> Benchmark }]
 			var rowData = marks
@@ -271,8 +268,15 @@ namespace CompilerBenchmarker
             	Directory.SetCurrentDirectory(write_to);
 
             	var baseFileName = $"results_{DateTime.Now.ToString("yyyyMMddTHHmmss")}";
+				var systemInfoFileName = $"{DateTime.Now.ToString("yyyyMMdd")}_systemInfo.txt";
             	var ongoingResultsFileName = $"{baseFileName}_ongoing.csv";
 				var finalResultFileName = $"{baseFileName}_final.csv";
+				if (!File.Exists(systemInfoFileName))
+				{
+					var info = BasicSystemInfo.Find();
+					var infoText = new[] { info.OS, info.CPU, info.Memory }.Join("\n\n");
+					File.WriteAllText(systemInfoFileName, infoText);
+				}
 				if (File.Exists(ongoingResultsFileName))
 					File.Delete(ongoingResultsFileName);
 				if (File.Exists(finalResultFileName))
@@ -295,7 +299,7 @@ namespace CompilerBenchmarker
 			}
 			catch (Exception e)
 			{
-				Console.WriteLine(e.Message);
+				Console.WriteLine(e.ToString());
 			}
 		}
 	}
