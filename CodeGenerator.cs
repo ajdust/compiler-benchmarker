@@ -1623,7 +1623,8 @@ namespace CompilerBenchmarker
                 case "java": return new JavaLang();
                 case "scala": return new ScalaLang();
                 default:
-                    throw new ArgumentOutOfRangeException(nameof(lang), $"{lang} is not supported by the code generation. So code it for us all to enjoy!");
+                    throw new ArgumentOutOfRangeException(nameof(lang),
+                        $"{lang} is not supported by the code generation. So code it up!");
             }
         }
 
@@ -1633,8 +1634,6 @@ namespace CompilerBenchmarker
             if (File.Exists(filename))
                 File.Delete(filename);
 
-            // todo: rename to be C# standard style naming
-            // todo: write language files identically
             using (var f = new StreamWriter(filename))
             {
                 langwriter.WriteProgram(f,
