@@ -11,8 +11,8 @@ namespace CompilerBenchmarker
 {
 	static class StringExtensions
 	{
-		public static string Join(this IEnumerable<string> s, string delimiter)
-			=> string.Join(delimiter, s);
+		public static string Join(this IEnumerable<string> s, string delimiter) =>
+			string.Join(delimiter, s);
 	}
 
 	class CompilerComparer : IComparer<Compiler>, IEqualityComparer<Compiler>
@@ -23,26 +23,25 @@ namespace CompilerBenchmarker
 			var exeCompared = sc.Compare(left.Exe, right.Exe);
 			if (exeCompared == 0)
 			{
-				var leftArgs = string.Join("", left.Arguments);
-				var rightArgs = string.Join("", right.Arguments);
+				var leftArgs = string.Join("", left.OptimizeArguments);
+				var rightArgs = string.Join("", right.OptimizeArguments);
 				return sc.Compare(leftArgs, rightArgs);
 			}
 
 			return exeCompared;
 		}
 
-		public bool Equals(Compiler left, Compiler right)
-			=> Compare(left, right) == 0;
+		public bool Equals(Compiler left, Compiler right) =>
+			Compare(left, right) == 0;
 
 		public int GetHashCode(Compiler c)
 		{
-			return new[] { c.Language, c.Exe }
-				.Concat(c.Arguments)
-				.Aggregate(4021, (prev, next) => prev ^ next.GetHashCode());
+			var h = 4021 ^ c.Language.GetHashCode() ^ c.Exe.GetHashCode();
+			return c.OptimizeArguments == null ? h :h ^ c.OptimizeArguments.GetHashCode();
 		}
 	}
 
-	struct Compiler
+	class Compiler
 	{
 		// The name of the language, e.g. "C"
 		public string Language;
@@ -51,9 +50,17 @@ namespace CompilerBenchmarker
 		// The compiler executable, e.g. "gcc"
 		public string Exe;
 		// The arguments to the compiler executabe, e.g. "-O"
-		public string[] Arguments;
+		public string OptimizeArguments;
+		public string VersionArgument;
+		public string MiscArguments;
+		public string Version;
+		public string VersionTrimmed;
 
-		public Compiler(string language, string extension, string exe, params string[] arguments)
+		public Compiler(
+			string language, string extension, string exe,
+			string versionArgument,
+			string optimizeArguments = null,
+			string miscArguments = null)
 		{
 			if (string.IsNullOrWhiteSpace(language))
 				throw new ArgumentNullException(nameof(language));
@@ -61,31 +68,63 @@ namespace CompilerBenchmarker
 				throw new ArgumentNullException(nameof(extension));
 			if (string.IsNullOrWhiteSpace(exe))
 				throw new ArgumentNullException(nameof(exe));
+			if (string.IsNullOrWhiteSpace(versionArgument))
+				throw new ArgumentNullException(nameof(versionArgument), "Missing option to determine compiler version");
 
 			Language = language;
 			Extension = extension;
 			Exe = exe;
-			Arguments = arguments ?? new string[] {};
+			VersionArgument = versionArgument;
+			OptimizeArguments = optimizeArguments;
+			MiscArguments = miscArguments;
+			CheckCompilerAndSetVersion();
 		}
 
 		public override string ToString()
 		{
-			if (Arguments.Length == 0)
-				return $"{Language} ({Exe})";
+			return OptimizeArguments != null
+				? $"{Language} ({Exe} {OptimizeArguments}) [{VersionTrimmed}]"
+				: $"{Language} ({Exe}) [{VersionTrimmed}]";
+		}
 
-			var args = string.Join(" ", Arguments);
-			return $"{Language} ({Exe} {args})";
+		public string ToVerboseString() => ToString() + " " + Version;
+
+		void CheckCompilerAndSetVersion()
+		{
+			using (var p = new Process())
+			{
+				p.StartInfo.FileName = Exe;
+				p.StartInfo.Arguments = VersionArgument;
+				p.StartInfo.UseShellExecute = false;
+				p.StartInfo.RedirectStandardOutput = true;
+				p.StartInfo.RedirectStandardError = true;
+				p.Start();
+				var sout = p.StandardOutput.ReadToEnd();
+				var serr = p.StandardError.ReadToEnd();
+				var o = string.IsNullOrWhiteSpace(sout) ? serr : sout;
+				if (o == null)
+					return;
+
+				var line = o.Split('\n').Where(x => !string.IsNullOrWhiteSpace(x)).FirstOrDefault()?.Trim();
+				if (line == null)
+					return;
+
+				var r = new System.Text.RegularExpressions.Regex(@"(v?\d[\d\w.-]+)");
+				var m = r.Match(line);
+				Version = line;
+				VersionTrimmed = m.Success ? m.Captures.First().Value : o;
+			}
 		}
 	}
 
-	struct CompilerBenchmark
+	class CompilerBenchmark
 	{
 		public Compiler Compiler;
 		public TimeSpan TimeToCompile;
 		public bool Compiled;
 		public int NumberFunctions;
-		public string SecondsToCompile
-			=> Compiled ? TimeToCompile.TotalSeconds.ToString() : "";
+		public string SecondsToCompile =>
+			Compiled ? TimeToCompile.TotalSeconds.ToString() : "";
 
 		public static CompilerBenchmark Success(Compiler compiler, TimeSpan timeToCompile, int numberFunctions)
 		{
@@ -115,7 +154,7 @@ namespace CompilerBenchmarker
 		{
 			var watch = new Stopwatch();
 			watch.Start();
-			var args = string.Join(" ", compiler.Arguments.Concat(new[] { codeFilePath }));
+			var args = compiler.MiscArguments + " " + compiler.OptimizeArguments + " " + codeFilePath;
 			Console.WriteLine($"  - Running with {numFun}: {compiler.Exe} {args}");
 			using (var p = Process.Start(compiler.Exe, args))
 			{
@@ -220,46 +259,52 @@ namespace CompilerBenchmarker
 				{ "numberAtStart", numberAtStart },
 				{ "numberOfSteps", numberOfSteps },
 				{ "increaseOnStep", stepIncreaseNumber }
-				// todo:
-				// cleanup on/off (on by default)
-				// result file name, + show results to stdout to be on by default
-				// csv file name (timestamped default)
-				// put results in timestamped CSV file (on by default)
+				// options todo:
+				// - cleanup on/off (on by default)
+				// - csv file name (timestamped default)
+				// - additional compilers or options somehow
 			};
-
-			var compilers = new List<Compiler>
-			{
-				// native section
-				// new Compiler("C", "c", "gcc", "-O2"),
-				// new Compiler("C++", "cpp", "g++", "-O2"),
-				// new Compiler("C++", "cpp", "clang", "-O2"),
-				// new Compiler("Go", "go", "go", "build"),
-				// new Compiler("Rust", "rs", "rustc", "-C", "opt-level=2"),
-				// new Compiler("D", "d", "dmd", "-O"),
-				// new Compiler("D", "d", "gdc", "-O"),
-				// new Compiler("D", "d", "ldc2", "-O"),
-				// new Compiler("Haskell", "hs", "ghc", "-O"),
-				// new Compiler("OCaml", "ml", "ocamlopt", "-O2"),
-
-				// // VM section
-				new Compiler("CSharp", "cs", "csc", "/o"),
-				new Compiler("FSharp", "fs", "fsharpc", "-O"),
-				// new Compiler("Java", "java", "javac", "-J-Xmx4096M", "-J-Xms64M"),
-				new Compiler("Scala", "scala", "scalac", "-optimise"), // modified to use Java -Xmx4096M -Xms64M -Xss4m
-				new Compiler("Scala", "scala", "dotc", "-optimise"), // modified to use Java -Xmx4096M -Xss4m
-				new Compiler("Kotlin", "kt", "kotlinc"), // modified to use Java -Xmx4096M -Xms64M -Xss4m
-			};
-			// todo: verify compilers exist on system
-			// todo: write hardware/software report (compiler version, OS, Kernel, CPU, Memory, HD)
-			// todo: duplicate compiler detection
-			// todo: Ctrl+C writes results so far
-			// todo: other keys to skip/abort language/number functions?
-			// todo: compiler timeout feature?
-			// todo: total timeout feature?
 
 			try
 			{
+				var compilers = new List<Compiler>
+				{
+					// Native
+					new Compiler("C",         "c",      "gcc", "--version", "-O2"),
+					new Compiler("C++",     "cpp",      "g++", "--version", "-O2"),
+					new Compiler("C++",     "cpp",    "clang", "--version", "-O2"),
+					new Compiler("Go",       "go",       "go",   "version", "build"),
+					new Compiler("Rust",     "rs",    "rustc", "--version", "-C opt-level=2"),
+					new Compiler("D",         "d",      "dmd", "--version", "-O"),
+					new Compiler("D",         "d",      "gdc", "--version", "-O"),
+					new Compiler("D",         "d",     "ldc2", "--version", "-O"),
+					new Compiler("Haskell",  "hs",      "ghc", "--version", "-O"),
+					new Compiler("OCaml",    "ml", "ocamlopt", "--version", "-O2"),
+					// VM
+					new Compiler("CSharp",   "cs",      "csc", "/version", "/o", miscArguments: "/nowarn:1717"),
+					new Compiler("FSharp",   "fs",  "fsharpc",   "--help", "-O", miscArguments: "--nologo"), // fsharpc does not have a version flag?
+					new Compiler("Java",   "java",    "javac", "-version",       miscArguments: "-J-Xmx4096M -J-Xms64M"),
+					new Compiler("Scala", "scala",   "scalac", "-version", "-optimise"), // modified to use Java -Xmx4096M -Xms64M -Xss4m
+					new Compiler("Scala", "scala",     "dotc", "-version", "-optimise"), // modified to use Java -Xmx4096M -Xss4m
+					new Compiler("Kotlin",   "kt",  "kotlinc", "-version"),              // modified to use Java -Xmx4096M -Xms64M -Xss4m
+				};
+
+				foreach (var c in compilers.GroupBy(x => x.Exe).Select(x => x.First()))
+				{
+					Console.WriteLine($"Found compiler: {c.Exe} ::: {c.Version}");
+				}
+
+				Console.WriteLine("\n");
+
+				// todo: verify compilers exist on system
+				// todo: write hardware/software report (compiler version, OS, Kernel, CPU, Memory, HD)
+				// todo: duplicate compiler detection
+				// todo: Ctrl+C writes results so far
+				// todo: other keys to skip/abort language/number functions?
+				// todo: compiler timeout feature?
+				// todo: total timeout feature?
 				// todo: pass in this option, enforce it is in bin at least if inside
+
 				var home = Environment.GetEnvironmentVariable("HOME");
 				var write_to = $"{home}/testfiles";
 				if (!Directory.Exists(write_to))
