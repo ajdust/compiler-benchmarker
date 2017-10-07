@@ -36,7 +36,7 @@ namespace CompilerBenchmarker
 
 		public int GetHashCode(Compiler c)
 		{
-			var h = 4021 ^ c.Language.GetHashCode() ^ c.Exe.GetHashCode();
+			var h = 4021 ^ c.Language.GetHashCode() ^ c.Exe.GetHashCode() ^ c.VersionTrimmed.GetHashCode();
 			return c.OptimizeArguments == null ? h :h ^ c.OptimizeArguments.GetHashCode();
 		}
 	}
@@ -180,7 +180,7 @@ namespace CompilerBenchmarker
 			List<Compiler> compilers, int numberAtStart, int numberOfSteps, int increaseOnStep)
 		{
 			var codeGen = new CodeGen();
-			var failed = new HashSet<Compiler>();
+			var failed = new HashSet<Compiler>(new CompilerComparer());
 			// todo: record compiler failure reason
 			foreach (var langCompilers in compilers.GroupBy(x => x.Language))
 			{
