@@ -180,6 +180,8 @@ namespace CompilerBenchmarker
 			List<Compiler> compilers, int numberAtStart, int numberOfSteps, int increaseOnStep)
 		{
 			var codeGen = new CodeGen();
+			var failed = new HashSet<Compiler>();
+			// todo: record compiler failure reason
 			foreach (var langCompilers in compilers.GroupBy(x => x.Language))
 			{
 				Console.WriteLine($"Benchmarking {langCompilers.Key}:");
@@ -204,8 +206,11 @@ namespace CompilerBenchmarker
 					foreach (var compiler in langCompilers)
 					{
 						// run benchmark
-						// todo: if compiler fails at a certain number of functions, do not run it for the next round
+						if (failed.Contains(compiler))
+							yield return CompilerBenchmark.Failure(compiler, numFun);
 						var bench = RunBenchmark(compiler, codeFilePath, numFun);
+						if (!bench.HasValue)
+							failed.Add(compiler);
 						yield return bench.HasValue
 							? CompilerBenchmark.Success(compiler, bench.Value, numFun)
 							: CompilerBenchmark.Failure(compiler, numFun);
