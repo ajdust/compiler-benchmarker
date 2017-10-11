@@ -192,7 +192,7 @@ namespace CompilerBenchmarker
 					// generate file
 					Console.Write($"- Generating {langCompilers.Key} with {numFun} functions.. ");
 					// todo: don't use existing files by default, just have the option to
-		            var codeFilePath = $"test_{numFun}.{langCompilers.First().Extension}";
+		            var codeFilePath = $"test_{langCompilers.First().Extension}_{numFun}.{langCompilers.First().Extension}";
 		            if (File.Exists(codeFilePath))
 		            {
 		            	Console.Write("Exists already.");
@@ -207,7 +207,11 @@ namespace CompilerBenchmarker
 					{
 						// run benchmark
 						if (failed.Contains(compiler))
+						{
 							yield return CompilerBenchmark.Failure(compiler, numFun);
+							continue;
+						}
+
 						var bench = RunBenchmark(compiler, codeFilePath, numFun);
 						if (!bench.HasValue)
 							failed.Add(compiler);
@@ -254,8 +258,8 @@ namespace CompilerBenchmarker
 
 		static void Main(string[] args)
 		{
-			int numberAtStart = 20;
-			int numberOfSteps = 1;
+			int numberAtStart = 5000;
+			int numberOfSteps = 10;
 			int stepIncreaseNumber = 5000;
 
 			// todo: good command-line options library for C#?
@@ -275,22 +279,35 @@ namespace CompilerBenchmarker
 				var compilers = new List<Compiler>
 				{
 					// Native
-					new Compiler("C",         "c",      "gcc", "--version", "-O2"),
+					new Compiler("C",         "c",      "gcc", "--version", "-O2"), // optimized
+					new Compiler("C",         "c",      "gcc", "--version"),        // default
 					new Compiler("C++",     "cpp",      "g++", "--version", "-O2"),
+					new Compiler("C++",     "cpp",      "g++", "--version"),
 					new Compiler("C++",     "cpp",    "clang", "--version", "-O2"),
-					new Compiler("Go",       "go",       "go",   "version", "build"),
+					new Compiler("C++",     "cpp",    "clang", "--version"),
 					new Compiler("Rust",     "rs",    "rustc", "--version", "-C opt-level=2"),
+					new Compiler("Rust",     "rs",    "rustc", "--version"),
 					new Compiler("D",         "d",      "dmd", "--version", "-O"),
+					new Compiler("D",         "d",      "dmd", "--version"),
 					new Compiler("D",         "d",      "gdc", "--version", "-O"),
+					new Compiler("D",         "d",      "gdc", "--version"),
 					new Compiler("D",         "d",     "ldc2", "--version", "-O"),
-					new Compiler("Haskell",  "hs",      "ghc", "--version", "-O"),
+					new Compiler("D",         "d",     "ldc2", "--version"),
 					new Compiler("OCaml",    "ml", "ocamlopt", "--version", "-O2"),
+					new Compiler("OCaml",    "ml", "ocamlopt", "--version"),
+					new Compiler("Haskell",  "hs",      "ghc", "--version", "-O"),
+					new Compiler("Haskell",  "hs",      "ghc", "--version"),
+					new Compiler("Go",       "go",       "go",   "version", "build"),
 					// VM
 					new Compiler("CSharp",   "cs",      "csc", "/version", "/o", miscArguments: "/nowarn:1717"),
+					new Compiler("CSharp",   "cs",      "csc", "/version",       miscArguments: "/nowarn:1717"),
 					new Compiler("FSharp",   "fs",  "fsharpc",   "--help", "-O", miscArguments: "--nologo"), // fsharpc does not have a version flag?
+					new Compiler("FSharp",   "fs",  "fsharpc",   "--help",       miscArguments: "--nologo"), // fsharpc does not have a version flag?
 					new Compiler("Java",   "java",    "javac", "-version",       miscArguments: "-J-Xmx4096M -J-Xms64M"),
 					new Compiler("Scala", "scala",   "scalac", "-version", "-optimise"), // modified to use Java -Xmx4096M -Xms64M -Xss4m
+					new Compiler("Scala", "scala",   "scalac", "-version"),              // modified to use Java -Xmx4096M -Xms64M -Xss4m
 					new Compiler("Scala", "scala",     "dotc", "-version", "-optimise"), // modified to use Java -Xmx4096M -Xss4m
+					new Compiler("Scala", "scala",     "dotc", "-version"),              // modified to use Java -Xmx4096M -Xss4m
 					new Compiler("Kotlin",   "kt",  "kotlinc", "-version"),              // modified to use Java -Xmx4096M -Xms64M -Xss4m
 				};
 
@@ -302,13 +319,8 @@ namespace CompilerBenchmarker
 				Console.WriteLine("\n");
 
 				// todo: verify compilers exist on system
-				// todo: write hardware/software report (compiler version, OS, Kernel, CPU, Memory, HD)
-				// todo: duplicate compiler detection
-				// todo: Ctrl+C writes results so far
-				// todo: other keys to skip/abort language/number functions?
-				// todo: compiler timeout feature?
-				// todo: total timeout feature?
-				// todo: pass in this option, enforce it is in bin at least if inside
+				// todo: control keys to skip/abort language/number functions during runtime
+				// todo: compiler compiling timeout, total timeout
 
 				var home = Environment.GetEnvironmentVariable("HOME");
 				var write_to = $"{home}/testfiles";
