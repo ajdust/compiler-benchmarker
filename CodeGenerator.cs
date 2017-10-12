@@ -915,7 +915,7 @@ namespace CompilerBenchmarker
             if (program == null)
                 throw new ArgumentNullException(nameof(program));
 
-            f.Write("#![allow(unusedParens)]\n\n");
+            f.Write("#![allow(unused_parens)]\n\n");
             foreach (var funDecl in program.Functions)
             {
                 writeFunDecl(f, funDecl);

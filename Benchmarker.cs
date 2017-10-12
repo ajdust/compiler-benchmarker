@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace CompilerBenchmarker
@@ -179,6 +180,15 @@ namespace CompilerBenchmarker
 		static IEnumerable<CompilerBenchmark> RunBenchmarks(
 			List<Compiler> compilers, int numberAtStart, int numberOfSteps, int increaseOnStep)
 		{
+			var codeExt = compilers
+				.Select(x => $"\\d.{x.Extension}$")
+				.Distinct();
+			var notCodeExt = $"{codeExt.Join("|")}|.csv$|.txt$";
+			Action<FileInfo> toDelete = fileInfo => {
+				if (!Regex.IsMatch(fileInfo.FullName, notCodeExt))
+					File.Delete(fileInfo.FullName);
+			};
+
 			var codeGen = new CodeGen();
 			var failed = new HashSet<Compiler>(new CompilerComparer());
 			// todo: record compiler failure reason
@@ -218,6 +228,9 @@ namespace CompilerBenchmarker
 						yield return bench.HasValue
 							? CompilerBenchmark.Success(compiler, bench.Value, numFun)
 							: CompilerBenchmark.Failure(compiler, numFun);
+
+						// remove compiler artifacts
+						FileWalker.Walk(Directory.GetCurrentDirectory(), toDelete, FileWalker.OnDirDoNothing);
 					}
 
 					// todo: pass in file cleanup options
@@ -259,7 +272,7 @@ namespace CompilerBenchmarker
 		static void Main(string[] args)
 		{
 			int numberAtStart = 5000;
-			int numberOfSteps = 10;
+			int numberOfSteps = 1;
 			int stepIncreaseNumber = 5000;
 
 			// todo: good command-line options library for C#?
