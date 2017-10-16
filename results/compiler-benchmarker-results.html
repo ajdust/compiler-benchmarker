@@ -1,0 +1,59 @@
+<html>
+<head>
+  <meta charset="utf-8" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dygraph/2.0.0/dygraph.min.js" integrity="sha384-7GkOXVYF0XSclperhm8baNtpMGCjiO+pxUeJofevmxRplT9j0OPEQVJ3XK59KEKi" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/dygraph/2.0.0/dygraph.min.css" integrity="sha384-87RI/ohPyciweUFQBSb6FIoq7ACWHPWXRbUIdvkodQ4gY+0BT5Y8MWG96w5GN/lE" crossorigin="anonymous">
+</head>
+<body>
+  <div id="chart" style="height: 800px; width: 1500px;"></div>
+  <div>
+    <br/>
+    <h4>To show/hide:</h4>
+    <div id="labelselect"></div>
+  </div>
+  <script>
+  var g = new Dygraph(document.getElementById('chart'), "results_20171015T110305_final.csv", {
+    legend: 'always',
+    title: 'Compiler Timings vs. Number of Functions',
+    ylabel: 'Time (seconds)',
+    xRangePad: 50,
+    highlightSeriesOpts: {
+      strokeWidth: 3,
+      strokeBorderWidth: 1,
+      highlightCircleSize: 5
+    }
+  });
+
+  function toggle(el) {
+    var toToggle = parseInt(el.getAttribute('data-series-index'));
+    g.setVisibility(toToggle, el.checked);
+  }
+
+  document.addEventListener("DOMContentLoaded", function(event) {
+
+      var labels = g.getLabels();
+      var html = '';
+      for (var i = 1; i < labels.length; i++) {
+        var label = labels[i];
+        html += '<input type="checkbox" checked onClick="toggle(this)" data-series-index="' + (i-1) + '"/>' + '<label>' + label + '</label><br/>';
+      }
+
+      document.getElementById('labelselect').innerHTML = html;
+
+    //do work
+  });
+  </script>
+  <style>
+    .dygraph-legend {
+      width: 450px;
+      background-color: transparent;
+    }
+    .dygraph-legend > span {
+      display: block;
+    }
+    .dygraph-legend > span.highlight {
+      background-color: #ccc;
+    }
+  </style>
+</body>
+</html>
