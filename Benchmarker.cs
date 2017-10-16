@@ -272,7 +272,7 @@ namespace CompilerBenchmarker
 		static void Main(string[] args)
 		{
 			int numberAtStart = 5000;
-			int numberOfSteps = 1;
+			int numberOfSteps = 10;
 			int stepIncreaseNumber = 5000;
 
 			// todo: good command-line options library for C#?
