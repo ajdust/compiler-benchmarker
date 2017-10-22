@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha384-xBuQ/xzmlsLoJpyjoggmTEz8OWUFM0/RC5BsqQBDX2v5cMvDHcMakNTNrHIW2I5f" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dygraph/2.0.0/dygraph.min.js" integrity="sha384-7GkOXVYF0XSclperhm8baNtpMGCjiO+pxUeJofevmxRplT9j0OPEQVJ3XK59KEKi" crossorigin="anonymous"></script>
+  <script src="shapes.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/dygraph/2.0.0/dygraph.min.css" integrity="sha384-87RI/ohPyciweUFQBSb6FIoq7ACWHPWXRbUIdvkodQ4gY+0BT5Y8MWG96w5GN/lE" crossorigin="anonymous">
 </head>
 
@@ -95,24 +96,133 @@ String.prototype.replaceAll = function(search, replacement) {
 
 $(function(event) {
 
-  var graph = new Dygraph(document.getElementById('chart'), "results_20171015T110305_final_noversion.csv", {
+  var langColor = {
+    'C': '#555555',
+    'C': '#555555',
+    'C++': '#f34b7d',
+    'C++': '#f34b7d',
+    'C++': '#f34b7d',
+    'C++': '#f34b7d',
+    'Rust': '#dea584',
+    'Rust': '#dea584',
+    'D': '#ba595e',
+    'D': '#ba595e',
+    'D': '#ba595e',
+    'D': '#ba595e',
+    'D': '#ba595e',
+    'D': '#ba595e',
+    'OCaml': '#3be133',
+    'OCaml': '#3be133',
+    'Haskell': '#29b544',
+    'Haskell': '#29b544',
+    'Go': '#375eab',
+    'CSharp': '#178600',
+    'CSharp': '#178600',
+    'FSharp': '#b845fc',
+    'FSharp': '#b845fc',
+    'Java': '#b07219',
+    'Scala': '#DC322F',
+    'Scala': '#DC322F',
+    'Scala': '#DC322F',
+    'Scala': '#DC322F',
+    'Kotlin': '#F18E33',
+  };
+
+  var pointCallback = function(g, seriesName, canvasContext, cx, cy, color, pointSize) {
+      var dc = Dygraph.Circles;
+      var fillColor = color;
+      if (
+        seriesName.indexOf('/o') >= 0 ||
+        seriesName.indexOf('-optim') >= 0 ||
+        seriesName.indexOf('-O') >= 0 ||
+        seriesName.indexOf('-C') >= 0) {
+        fillColor = "white";
+      }
+
+      var use = dc.DEFAULT;
+      if (
+        seriesName.indexOf('C ') >= 0 ||
+        seriesName.indexOf('C++') >= 0 ||
+        seriesName.indexOf('D ') >= 0 ||
+        seriesName.indexOf('Rust') >= 0 ||
+        seriesName.indexOf('Go') >= 0) {
+        use = dc.CIRCLE;
+      } else if (
+        seriesName.indexOf('Haskell') >= 0 ||
+        seriesName.indexOf('OCaml') >= 0 ||
+        seriesName.indexOf('FSharp') >= 0 ||
+        seriesName.indexOf('Scala') >= 0) {
+        use = dc.DIAMOND;
+      } else {
+        use = dc.TRIANGLE;
+      }
+
+      use(g, seriesName, canvasContext, cx, cy, color, pointSize, fillColor);
+
+      // dc.DEFAULT;
+      // dc.CIRCLE;
+      // dc.HEXAGON;
+      // dc.PENTAGON;
+      // dc.SQUARE;
+      // dc.EX;
+      // dc.PLUS;
+      // dc.TRIANGLE;
+      // dc.DIAMOND;
+      // dc.STAR;
+  };
+
+  graph = new Dygraph(document.getElementById('chart'), "results_20171015T110305_final_noversion.csv", {
     legend: 'always',
     title: 'Compiler Timings vs. Number of Functions',
     ylabel: 'Time (seconds)',
     xlabel: 'Function count',
     xRangePad: 50,
     drawPoints: true,
+    pointSize: 5,
     highlightSeriesOpts: {
       strokeWidth: 3,
       strokeBorderWidth: 1,
       highlightCircleSize: 5
-    }
+    },
+    colors: [
+      langColor['C'], // C (gcc)
+      langColor['C'], // C (gcc -O2)
+      langColor['C++'], // C++ (g++ -O2)
+      langColor['C++'], // C++ (g++)
+      langColor['C++'], // C++ (clang -O2)
+      langColor['C++'], // C++ (clang)
+      langColor['Rust'], // Rust (rustc -C opt-level=2)
+      langColor['Rust'], // Rust (rustc)
+      langColor['D'], // D (dmd -O)
+      langColor['D'], // D (dmd)
+      langColor['D'], // D (gdc -O)
+      langColor['D'], // D (gdc)
+      langColor['D'], // D (ldc2 -O)
+      langColor['D'], // D (ldc2)
+      langColor['OCaml'], // OCaml (ocamlopt -O2)
+      langColor['OCaml'], // OCaml (ocamlopt)
+      langColor['Haskell'], // Haskell (ghc -O)
+      langColor['Haskell'], // Haskell (ghc)
+      langColor['Go'], // Go (go build)
+      langColor['CSharp'], // CSharp (csc /o)
+      langColor['CSharp'], // CSharp (csc)
+      langColor['FSharp'], // FSharp (fsharpc -O)
+      langColor['FSharp'], // FSharp (fsharpc)
+      langColor['Java'], // Java (javac)
+      langColor['Scala'], // Scala (scalac -optimise)
+      langColor['Scala'], // Scala (scalac)
+      langColor['Scala'], // Scala (dotc -optimise)
+      langColor['Scala'], // Scala (dotc)
+      langColor['Kotlin'], // Kotlin (kotlinc)
+    ],
+    drawPointCallback: pointCallback,
+    drawHighlightPointCallback: pointCallback
   });
 
   graph.ready(function() {
 
     var labels = graph.getLabels();
-    var native = ['C ', 'C++', 'Rust', 'D', 'OCaml', 'Haskell', 'Go'];
+    var native = ['C ', 'C++', 'Rust', 'D ', 'OCaml', 'Haskell', 'Go'];
     var vm = ['Java', 'CSharp', 'FSharp', 'Scala', 'Kotlin'];
     var functional = [ 'FSharp', 'Haskell', 'OCaml'];
     var optflags = ['-C', '-o', '-O', '/o']
@@ -147,11 +257,6 @@ $(function(event) {
               ? { label: v, index: i } : null;
         })
         .filter(function (v) { return v !== null; });
-
-      console.log(labels);
-      console.log(containing);
-      console.log('Show: ', show);
-      console.log(labelmatches.map(function (v) { return v.label; }));
 
       for (var i = 0; i < labelmatches.length; i++) {
         showhide[labelmatches[i].index] = show;
