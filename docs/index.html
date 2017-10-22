@@ -101,6 +101,7 @@ $(function(event) {
     ylabel: 'Time (seconds)',
     xlabel: 'Function count',
     xRangePad: 50,
+    drawPoints: true,
     highlightSeriesOpts: {
       strokeWidth: 3,
       strokeBorderWidth: 1,
@@ -113,7 +114,7 @@ $(function(event) {
     var labels = graph.getLabels();
     var native = ['C ', 'C++', 'Rust', 'D', 'OCaml', 'Haskell', 'Go'];
     var vm = ['Java', 'CSharp', 'FSharp', 'Scala', 'Kotlin'];
-    var functional = [ 'Fsharp', 'Haskell', 'OCaml'];
+    var functional = [ 'FSharp', 'Haskell', 'OCaml'];
     var optflags = ['-C', '-o', '-O', '/o']
     var showhide = {};
     for (var i = 1; i < labels.length; i++) {
