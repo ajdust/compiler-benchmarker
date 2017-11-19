@@ -20,7 +20,7 @@ int f1() {
 }
 ```
 
-This function is nearly identical is almost every language. You can see results for how compilers handle from 5000 to 50000 of these randomized functions [here](https://johnsonaa.github.io/compiler-benchmarker/). Compilers tested are gcc, g++, clang, rustc, dmd, gdc, ldc2, ocamlopt, ghc, go, csc, fsharpc, scalac, dotc, javac, and kotlinc. Naturally, benchmarks like these must be taken with a grain of salt. Firstly, I could have done something wrong. Secondly, this is just one set of results from one machine. Thirdly,  use of fancy language features (templates, macros, etc.) can drastically increase compilation time, just as fancy features such as incremental compilation can drastically reduce compilation time. This is only a look at raw cold-start compilation time. Nonetheless, it is interesting to see how compilers handle a 20MB 750K LOC file.
+This function is nearly identical is almost every language. You can see results for how compilers handle from 5000 to 50000 of these randomized functions [here](https://johnsabr.github.io/compiler-benchmarker/). Compilers tested are gcc, g++, clang, rustc, dmd, gdc, ldc2, ocamlopt, ghc, go, csc, fsharpc, scalac, dotc, javac, and kotlinc. Naturally, benchmarks like these must be taken with a grain of salt. Firstly, I could have done something wrong. Secondly, this is just one set of results from one machine. Thirdly,  use of fancy language features (templates, macros, etc.) can drastically increase compilation time, just as fancy features such as incremental compilation can drastically reduce compilation time. This is only a look at raw cold-start compilation time. Nonetheless, it is interesting to see how compilers handle a 20MB 750K LOC file.
 
 Inspired by this [reddit post](https://www.reddit.com/r/rust/comments/55k577/rust_compilation_times_compared_to_c_d_go_pascal).
 
@@ -37,7 +37,7 @@ Currently:
 
 ## Results discussion
 
-An interactive graph of the results can be seen [here](https://johnsonaa.github.io/compiler-benchmarker/). Below is a table of results (with seconds to compile) from a run on 2017-10-15, as sorted ascending on the 20000 column. System information is included in the results directory, and the results CSV includes the version of the compiler used. VM runtimes used: OpenJDK 1.8.0_131, Mono 5.2.0.224, and .NET Core 2.1.0 preview1.
+An interactive graph of the results can be seen [here](https://johnsabr.github.io/compiler-benchmarker/). Below is a table of results (with seconds to compile) from a run on 2017-10-15, as sorted ascending on the 20000 column. System information is included in the results directory, and the results CSV includes the version of the compiler used. VM runtimes used: OpenJDK 1.8.0_131, Mono 5.2.0.224, and .NET Core 2.1.0 preview1.
 
 | Number Functions | 5000 | 10000 | 15000 | 20000 | 25000 | 30000 | 35000 | 40000 | 45000 | 50000 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
