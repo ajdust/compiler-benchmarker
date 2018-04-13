@@ -8,7 +8,7 @@ namespace CompilerBenchmarker
 {
     public static class RandomExtensions
     {
-    	public static T Choice<T>(this Random r, IList<T> of) => of[r.Next(0, of.Count)];
+        public static T Choice<T>(this Random r, IList<T> of) => of[r.Next(0, of.Count)];
     }
 
     public interface IHasUsed
@@ -24,9 +24,9 @@ namespace CompilerBenchmarker
 
     class ConstExpr : Expr
     {
-    	public string Val {get;set;}
-    	public ConstExpr(string val)
-    	{
+        public string Val {get;set;}
+        public ConstExpr(string val)
+        {
             if (val == null)
                 throw new ArgumentNullException(nameof(val));
 
@@ -36,8 +36,8 @@ namespace CompilerBenchmarker
 
     class VarExpr : Expr
     {
-    	public VarExpr(string name)
-    	{
+        public VarExpr(string name)
+        {
             if (name == null)
                 throw new ArgumentNullException(nameof(name));
 
@@ -47,11 +47,11 @@ namespace CompilerBenchmarker
 
     class BinOp : Expr
     {
-    	public string Op {get;set;}
-    	public Expr Left {get;set;}
-    	public Expr Right {get;set;}
-    	public BinOp(string op, Expr left, Expr right)
-    	{
+        public string Op {get;set;}
+        public Expr Left {get;set;}
+        public Expr Right {get;set;}
+        public BinOp(string op, Expr left, Expr right)
+        {
             if (op == null)
                 throw new ArgumentNullException(nameof(op));
             if (left == null)
@@ -68,9 +68,9 @@ namespace CompilerBenchmarker
 
     class FunCallExpr : Expr
     {
-    	public override string Name {get;set;}
-    	public FunCallExpr(string name)
-    	{
+        public override string Name {get;set;}
+        public FunCallExpr(string name)
+        {
             if (name == null)
                 throw new ArgumentNullException(nameof(name));
 
@@ -85,9 +85,9 @@ namespace CompilerBenchmarker
 
     class Assignment : Statement
     {
-    	public string Lval {get;set;}
-    	public Assignment(string lval, Expr expr)
-    	{
+        public string Lval {get;set;}
+        public Assignment(string lval, Expr expr)
+        {
             if (expr == null)
                 throw new ArgumentNullException(nameof(expr));
             if (lval == null)
@@ -100,11 +100,11 @@ namespace CompilerBenchmarker
 
     class VarDecl : Statement, IHasUsed
     {
-    	public string Name {get;set;}
-    	public bool Mut {get;set;}
-    	public bool Used {get;set;}
-    	public VarDecl(string name, Expr expr)
-    	{
+        public string Name {get;set;}
+        public bool Mut {get;set;}
+        public bool Used {get;set;}
+        public VarDecl(string name, Expr expr)
+        {
             if (expr == null)
                 throw new ArgumentNullException(nameof(expr));
             if (name == null)
@@ -119,8 +119,8 @@ namespace CompilerBenchmarker
 
     class Return : Statement
     {
-    	public Return(Expr expr)
-    	{
+        public Return(Expr expr)
+        {
             if (expr == null)
                 throw new ArgumentNullException(nameof(expr));
 
@@ -130,8 +130,8 @@ namespace CompilerBenchmarker
 
     class Print : Statement
     {
-    	public Print(Expr expr)
-    	{
+        public Print(Expr expr)
+        {
             if (expr == null)
                 throw new ArgumentNullException(nameof(expr));
 
@@ -141,12 +141,12 @@ namespace CompilerBenchmarker
 
     class FunDecl : IHasUsed
     {
-    	public string Name {get;set;}
-    	public IList<Statement> Statements {get;set;}
-    	public string ReturnType {get;set;}
+        public string Name {get;set;}
+        public IList<Statement> Statements {get;set;}
+        public string ReturnType {get;set;}
         public bool Used {get;set;}
-    	public FunDecl(string name, IList<Statement> statements, string returnType)
-    	{
+        public FunDecl(string name, IList<Statement> statements, string returnType)
+        {
             if (name == null)
                 throw new ArgumentNullException(nameof(name));
             if (statements == null)
@@ -163,10 +163,10 @@ namespace CompilerBenchmarker
 
     class Program
     {
-    	public FunDecl Main {get;set;}
-    	public IList<FunDecl> Functions {get;set;}
-    	public Program(FunDecl main, IList<FunDecl> functions)
-    	{
+        public FunDecl Main {get;set;}
+        public IList<FunDecl> Functions {get;set;}
+        public Program(FunDecl main, IList<FunDecl> functions)
+        {
             if (main == null)
                 throw new ArgumentNullException(nameof(main));
             if (functions == null)
@@ -179,46 +179,46 @@ namespace CompilerBenchmarker
 
     class Context
     {
-    	Dictionary<string, IHasUsed> Env {get;set;} = new Dictionary<string, IHasUsed>();
-    	int id {get;set;} = 0;
-    	Context parent {get;set;}
+        Dictionary<string, IHasUsed> Env {get;set;} = new Dictionary<string, IHasUsed>();
+        int id {get;set;} = 0;
+        Context parent {get;set;}
         Random random {get;set;}
 
-    	public Context(Context parent, Random random)
-    	{
+        public Context(Context parent, Random random)
+        {
             this.parent = parent;
             this.random = random;
-    	}
+        }
 
         string name(string prefix, int i)
         {
             return $"{prefix}{i}";
-    	}
+        }
 
         string newName(string prefix)
         {
             id += 1;
             return name(prefix, id);
-    	}
+        }
 
         string randomName(string prefix)
         {
             var biasedMin = random.Next(1, id);
             var i = random.Next(biasedMin, id);
             return name(prefix, i);
-    	}
+        }
 
         Expr randomExpr()
         {
-        	switch (random.Next(1, 5))
-        	{
+            switch (random.Next(1, 5))
+            {
                 case 1: return randomConstExpr();
                 case 2: return randomVarExpr();
                 case 3: return randomBinaryOp();
                 case 4: return randomFunCall();
                 default: throw new ArgumentOutOfRangeException();
             };
-    	}
+        }
 
         IHasUsed findUnused()
         {
@@ -228,7 +228,7 @@ namespace CompilerBenchmarker
                     return decl.Value;
             }
             return null;
-    	}
+        }
 
         Expr forceUseExpr()
         {
@@ -249,19 +249,19 @@ namespace CompilerBenchmarker
                 decl = parent.findUnused();
             }
             return expr;
-    	}
+        }
 
         ConstExpr randomConstExpr()
         {
             return new ConstExpr(random.Next(1, 1000).ToString());
-    	}
+        }
 
         VarExpr forcedVarExpr(string name)
         {
             var decl = Env[name];
             decl.Used = true;
             return new VarExpr(name);
-    	}
+        }
 
         Expr randomVarExpr()
         {
@@ -269,28 +269,28 @@ namespace CompilerBenchmarker
                 return randomConstExpr();
             var name = randomName("x");
             return forcedVarExpr(name);
-    	}
+        }
 
         BinOp forcedRandomBinaryOp(Expr left, Expr right)
         {
             //op = random.choice(["+", "-", "*", "|", "&", "^"]);
             var op = random.Choice(new[] {"|", "&", "^"});
             return new BinOp(op, left, right);
-    	}
+        }
 
         BinOp randomBinaryOp()
         {
             var left = randomExpr();
             var right = randomExpr();
             return forcedRandomBinaryOp(left, right);
-    	}
+        }
 
         FunCallExpr forcedFunCall(string name)
         {
             var decl = parent.Env[name];
             decl.Used = true;
             return new FunCallExpr(name);
-    	}
+        }
 
         Expr randomFunCall()
         {
@@ -298,17 +298,17 @@ namespace CompilerBenchmarker
                 return randomConstExpr();
             var name = parent.randomName("f");
             return forcedFunCall(name);
-    	}
+        }
 
         Statement randomStatement()
         {
-        	switch (random.Next(1, 3))
-        	{
+            switch (random.Next(1, 3))
+            {
                 case 1: return randomAssignment();
                 case 2: return randomVarDecl();
                 default: throw new ArgumentOutOfRangeException();
-        	}
-    	}
+            }
+        }
 
         Assignment randomAssignment()
         {
@@ -324,17 +324,17 @@ namespace CompilerBenchmarker
             if (decl is VarDecl)
                 (decl as VarDecl).Mut = true;
             return new Assignment(name, expr);
-    	}
+        }
 
         Return randomReturnStatement()
         {
             return new Return(forceUseExpr());
-    	}
+        }
 
         Print randomPrintStatement()
         {
             return new Print(forceUseExpr());
-    	}
+        }
 
         VarDecl randomVarDecl()
         {
@@ -343,7 +343,7 @@ namespace CompilerBenchmarker
             var decl = new VarDecl(name, expr);
             Env[name] = decl;
             return decl;
-    	}
+        }
 
         FunDecl randomFunDecl(int numStatements, string returnType)
         {
@@ -360,7 +360,7 @@ namespace CompilerBenchmarker
             var decl = new FunDecl(name, statements, returnType);
             Env[name] = decl;
             return decl;
-    	}
+        }
 
         public Program RandomProgram(int numFuns, int maxStatementsPerFun)
         {
@@ -381,8 +381,8 @@ namespace CompilerBenchmarker
     abstract class Lang
     {
         protected virtual string ext {get;}
-    	protected int indent {get;set;} = 0;
-    	protected int extraIndent {get;set;} = 0;
+        protected int indent {get;set;} = 0;
+        protected int extraIndent {get;set;} = 0;
 
         protected virtual Dictionary<string, string> operators => new Dictionary<string, string> {
             {"&", "&"},
@@ -399,7 +399,7 @@ namespace CompilerBenchmarker
                 s += " ";
             }
             f.Write(s);
-    	}
+        }
 
         abstract protected void writeFunDecl(StreamWriter f, FunDecl s, bool main = false);
 
@@ -428,7 +428,7 @@ namespace CompilerBenchmarker
                 writePrint(f, statement as Print);
             else
                 throw new Exception("Unknown kind of statement");
-    	}
+        }
 
         protected virtual void writeLval(StreamWriter f, string lval)
         {
@@ -436,7 +436,7 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(lval));
 
             f.Write(lval);
-    	}
+        }
 
         protected virtual void writeExpr(StreamWriter f, Expr expr, bool needsParens = false)
         {
@@ -453,7 +453,7 @@ namespace CompilerBenchmarker
                 writeFunCall(f, expr as FunCallExpr, needsParens);
             else
                 throw new Exception("Unknown kind of expr");
-    	}
+        }
 
         protected virtual void writeConstExpr(StreamWriter f, ConstExpr expr, bool needsParens)
         {
@@ -461,7 +461,7 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(expr));
 
             f.Write(expr.Val);
-    	}
+        }
 
         protected virtual void writeVarExpr(StreamWriter f, VarExpr expr, bool needsParens)
         {
@@ -469,7 +469,7 @@ namespace CompilerBenchmarker
                 throw new ArgumentNullException(nameof(expr));
 
             f.Write(expr.Name);
-    	}
+        }
 
         protected virtual void writeBinOp(StreamWriter f, BinOp expr, bool needsParens)
         {
@@ -483,7 +483,7 @@ namespace CompilerBenchmarker
             writeExpr(f, expr.Right, needsParens);
             if (needsParens)
                 f.Write(")");
-    	}
+        }
 
         protected virtual void writeFunCall(StreamWriter f, FunCallExpr expr, bool needsParens)
         {
@@ -514,7 +514,7 @@ namespace CompilerBenchmarker
                 f.Write("\n");
             }
             writeFunDecl(f, program.Main, true);
-    	}
+        }
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
@@ -538,7 +538,7 @@ namespace CompilerBenchmarker
                 writeStatement(f, statement);
             indent -= 1;
             f.Write("}\n");
-    	}
+        }
 
         protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
@@ -551,7 +551,7 @@ namespace CompilerBenchmarker
             f.Write(" = ");
             writeExpr(f, varDecl.Expr);
             f.Write(";\n");
-    	}
+        }
 
         protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
@@ -563,7 +563,7 @@ namespace CompilerBenchmarker
             f.Write(" = ");
             writeExpr(f, assignment.Expr);
             f.Write(";\n");
-    	}
+        }
 
         protected override void writeReturn(StreamWriter f, Return statement)
         {
@@ -574,7 +574,7 @@ namespace CompilerBenchmarker
             f.Write("return ");
             writeExpr(f, statement.Expr);
             f.Write(";\n");
-    	}
+        }
 
         protected override void writePrint(StreamWriter f, Print statement)
         {
@@ -627,7 +627,7 @@ namespace CompilerBenchmarker
                 f.Write("\n");
             }
             writeFunDecl(f, program.Main, true);
-    	}
+        }
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
@@ -651,7 +651,7 @@ namespace CompilerBenchmarker
                 writeStatement(f, statement);
             indent -= 1;
             f.Write("}\n");
-    	}
+        }
 
         protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
@@ -664,7 +664,7 @@ namespace CompilerBenchmarker
             f.Write(" = ");
             writeExpr(f, varDecl.Expr);
             f.Write(";\n");
-    	}
+        }
 
         protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
@@ -676,7 +676,7 @@ namespace CompilerBenchmarker
             f.Write(" = ");
             writeExpr(f, assignment.Expr);
             f.Write(";\n");
-    	}
+        }
 
         protected override void writeReturn(StreamWriter f, Return statement)
         {
@@ -687,7 +687,7 @@ namespace CompilerBenchmarker
             f.Write("return ");
             writeExpr(f, statement.Expr);
             f.Write(";\n");
-    	}
+        }
 
         protected override void writePrint(StreamWriter f, Print statement)
         {
@@ -722,7 +722,7 @@ namespace CompilerBenchmarker
                 f.Write("\n");
             }
             writeFunDecl(f, program.Main, true);
-    	}
+        }
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
@@ -746,7 +746,7 @@ namespace CompilerBenchmarker
                 writeStatement(f, statement);
             indent -= 1;
             f.Write("}\n");
-    	}
+        }
 
         protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
@@ -758,7 +758,7 @@ namespace CompilerBenchmarker
             f.Write(" := ");
             writeExpr(f, varDecl.Expr);
             f.Write("\n");
-    	}
+        }
 
         protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
@@ -770,7 +770,7 @@ namespace CompilerBenchmarker
             f.Write(" = ");
             writeExpr(f, assignment.Expr);
             f.Write("\n");
-    	}
+        }
 
         protected override void writeReturn(StreamWriter f, Return statement)
         {
@@ -781,7 +781,7 @@ namespace CompilerBenchmarker
             f.Write("return ");
             writeExpr(f, statement.Expr);
             f.Write("\n");
-    	}
+        }
 
         protected override void writePrint(StreamWriter f, Print statement)
         {
@@ -821,7 +821,7 @@ namespace CompilerBenchmarker
                 f.Write("\n");
             }
             writeFunDecl(f, program.Main, true);
-    	}
+        }
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
@@ -852,7 +852,7 @@ namespace CompilerBenchmarker
                 writeStatement(f, statement);
             indent -= 1;
             f.Write("end{(main ? '.' : ';')}\n");
-    	}
+        }
 
         protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
@@ -864,7 +864,7 @@ namespace CompilerBenchmarker
             f.Write(" := ");
             writeExpr(f, varDecl.Expr);
             f.Write(";\n");
-    	}
+        }
 
         protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
@@ -876,7 +876,7 @@ namespace CompilerBenchmarker
             f.Write(" := ");
             writeExpr(f, assignment.Expr);
             f.Write(";\n");
-    	}
+        }
 
         protected override void writeReturn(StreamWriter f, Return statement)
         {
@@ -888,7 +888,7 @@ namespace CompilerBenchmarker
             f.Write(" := ");
             writeExpr(f, statement.Expr);
             f.Write(";\n");
-    	}
+        }
 
         protected override void writePrint(StreamWriter f, Print statement)
         {
@@ -922,7 +922,7 @@ namespace CompilerBenchmarker
                 f.Write("\n");
             }
             writeFunDecl(f, program.Main, true);
-    	}
+        }
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
@@ -947,7 +947,7 @@ namespace CompilerBenchmarker
                 writeStatement(f, statement);
             indent -= 1;
             f.Write("}\n");
-    	}
+        }
 
         protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
@@ -963,7 +963,7 @@ namespace CompilerBenchmarker
             f.Write(" = ");
             writeExpr(f, varDecl.Expr);
             f.Write(";\n");
-    	}
+        }
 
         protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
@@ -975,7 +975,7 @@ namespace CompilerBenchmarker
             f.Write(" = ");
             writeExpr(f, assignment.Expr);
             f.Write(";\n");
-    	}
+        }
 
         protected override void writeReturn(StreamWriter f, Return statement)
         {
@@ -985,7 +985,7 @@ namespace CompilerBenchmarker
             writeIndent(f);
             writeExpr(f, statement.Expr);
             f.Write("\n");
-    	}
+        }
 
         protected override void writePrint(StreamWriter f, Print statement)
         {
@@ -1024,7 +1024,7 @@ namespace CompilerBenchmarker
                 f.Write("\n");
             }
             writeFunDecl(f, program.Main, true);
-    	}
+        }
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
@@ -1049,7 +1049,7 @@ namespace CompilerBenchmarker
             indent -= 1;
             if (main)
                 f.Write("\nmain ()");
-    	}
+        }
 
         protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
@@ -1062,7 +1062,7 @@ namespace CompilerBenchmarker
             f.Write(" = ");
             writeExpr(f, varDecl.Expr);
             f.Write(" in \n");
-    	}
+        }
 
         protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
@@ -1075,7 +1075,7 @@ namespace CompilerBenchmarker
             f.Write(" = ");
             writeExpr(f, assignment.Expr);
             f.Write(" in \n");
-    	}
+        }
 
         protected override void writeReturn(StreamWriter f, Return statement)
         {
@@ -1085,7 +1085,7 @@ namespace CompilerBenchmarker
             writeIndent(f);
             writeExpr(f, statement.Expr);
             f.Write("\n");
-    	}
+        }
 
         protected override void writePrint(StreamWriter f, Print statement)
         {
@@ -1111,7 +1111,7 @@ namespace CompilerBenchmarker
             ["&"] = "&&&",
             ["|"] = "|||",
             ["^"] = "^^^",
-    	};
+        };
 
         public override void WriteProgram(StreamWriter f, Program program)
         {
@@ -1124,7 +1124,7 @@ namespace CompilerBenchmarker
                 f.Write("\n");
             }
             writeFunDecl(f, program.Main, true);
-    	}
+        }
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
@@ -1149,7 +1149,7 @@ namespace CompilerBenchmarker
             indent -= 1;
             if (main)
                 f.Write("\nmain ()");
-    	}
+        }
 
         protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
@@ -1162,7 +1162,7 @@ namespace CompilerBenchmarker
             f.Write(" = ");
             writeExpr(f, varDecl.Expr);
             f.Write(" in \n");
-    	}
+        }
 
         protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
@@ -1175,7 +1175,7 @@ namespace CompilerBenchmarker
             f.Write(" = ");
             writeExpr(f, assignment.Expr);
             f.Write(" in \n");
-    	}
+        }
 
         protected override void writeReturn(StreamWriter f, Return statement)
         {
@@ -1185,7 +1185,7 @@ namespace CompilerBenchmarker
             writeIndent(f);
             writeExpr(f, statement.Expr);
             f.Write("\n");
-    	}
+        }
 
         protected override void writePrint(StreamWriter f, Print statement)
         {
@@ -1212,7 +1212,7 @@ namespace CompilerBenchmarker
             ["&"] = "&&&",
             ["|"] = "|||",
             ["^"] = "^^^",
-    	};
+        };
 
         public override void WriteProgram(StreamWriter f, Program program)
         {
@@ -1235,7 +1235,7 @@ namespace CompilerBenchmarker
                 f.Write("\n");
             }
             writeFunDecl(f, program.Main, true);
-    	}
+        }
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
@@ -1262,7 +1262,7 @@ namespace CompilerBenchmarker
             foreach (var statement in funDecl.Statements.Skip(1))
                 writeStatement(f, statement);
             extraIndent = 0;
-    	}
+        }
 
         protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
@@ -1275,7 +1275,7 @@ namespace CompilerBenchmarker
             f.Write(" = ");
             writeExpr(f, varDecl.Expr);
             f.Write(" in \n");
-    	}
+        }
 
         protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
@@ -1291,7 +1291,7 @@ namespace CompilerBenchmarker
             f.Write(" = ");
             writeExpr(f, assignment.Expr);
             f.Write(" in \n");
-    	}
+        }
 
         protected override void writeReturn(StreamWriter f, Return statement)
         {
@@ -1301,7 +1301,7 @@ namespace CompilerBenchmarker
             writeIndent(f);
             writeExpr(f, statement.Expr);
             f.Write("\n");
-    	}
+        }
 
         protected override void writePrint(StreamWriter f, Print statement)
         {
@@ -1312,7 +1312,7 @@ namespace CompilerBenchmarker
             f.Write("printf \"%i\\n\" (");
             writeExpr(f, statement.Expr);
             f.Write(")\n");
-    	}
+        }
 
         protected override void writeFunCall(StreamWriter f, FunCallExpr expr, bool needsParens)
         {
@@ -1333,7 +1333,7 @@ namespace CompilerBenchmarker
             indent += 1;
             writeIndent(f);
             f.Write("static class Program\n");
-    	    writeIndent(f);
+            writeIndent(f);
             f.Write("{\n");
             indent += 1;
             foreach (var funDecl in program.Functions)
@@ -1348,7 +1348,7 @@ namespace CompilerBenchmarker
             f.Write("}\n");
             indent -= 1;
             f.Write("}\n");
-    	}
+        }
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
@@ -1381,7 +1381,7 @@ namespace CompilerBenchmarker
             indent -= 1;
             writeIndent(f);
             f.Write("}\n");
-    	}
+        }
 
         protected override void writePrint(StreamWriter f, Print statement)
         {
@@ -1459,7 +1459,7 @@ namespace CompilerBenchmarker
                 f.Write("\n");
             }
             writeFunDecl(f, program.Main, true);
-    	}
+        }
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
@@ -1483,7 +1483,7 @@ namespace CompilerBenchmarker
                 writeStatement(f, statement);
             indent -= 1;
             f.Write("}\n");
-    	}
+        }
 
         protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
@@ -1500,12 +1500,12 @@ namespace CompilerBenchmarker
             f.Write(" = ");
             writeExpr(f, varDecl.Expr);
             f.Write("\n");
-    	}
+        }
 
         protected override void writeConstExpr(StreamWriter f, ConstExpr expr, bool needsParens)
         {
             f.Write(expr.Val);
-    	}
+        }
 
         protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
@@ -1517,7 +1517,7 @@ namespace CompilerBenchmarker
             f.Write(" = ");
             writeExpr(f, assignment.Expr);
             f.Write("\n");
-    	}
+        }
 
         protected override void writeReturn(StreamWriter f, Return statement)
         {
@@ -1528,7 +1528,7 @@ namespace CompilerBenchmarker
             f.Write("return ");
             writeExpr(f, statement.Expr);
             f.Write("\n");
-    	}
+        }
 
         protected override void writePrint(StreamWriter f, Print statement)
         {
