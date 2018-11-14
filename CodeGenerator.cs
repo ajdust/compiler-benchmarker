@@ -13,23 +13,22 @@ namespace CompilerBenchmarker
 
     public interface IHasUsed
     {
-        bool Used {get;set;}
-        string Name {get;set;}
+        bool Used { get; set; }
+        string Name { get; set; }
     }
+
+
 
     abstract class Expr
     {
-        public virtual string Name {get;set;}
+        public virtual string Name { get; set; }
     }
 
     class ConstExpr : Expr
     {
-        public string Val {get;set;}
+        public string Val { get; set; }
         public ConstExpr(string val)
         {
-            if (val == null)
-                throw new ArgumentNullException(nameof(val));
-
             this.Val = val;
         }
     }
@@ -38,28 +37,17 @@ namespace CompilerBenchmarker
     {
         public VarExpr(string name)
         {
-            if (name == null)
-                throw new ArgumentNullException(nameof(name));
-
             this.Name = name;
         }
     }
 
-    class BinOp : Expr
+    class BinOpExpr : Expr
     {
-        public string Op {get;set;}
-        public Expr Left {get;set;}
-        public Expr Right {get;set;}
-        public BinOp(string op, Expr left, Expr right)
+        public string Op { get; set; }
+        public Expr Left { get; set; }
+        public Expr Right { get; set; }
+        public BinOpExpr(string op, Expr left, Expr right)
         {
-            if (op == null)
-                throw new ArgumentNullException(nameof(op));
-            if (left == null)
-                throw new ArgumentNullException(nameof(left));
-            if (right == null)
-                throw new ArgumentNullException(nameof(right));
-
-
             this.Op = op;
             this.Left = left;
             this.Right = right;
@@ -68,31 +56,23 @@ namespace CompilerBenchmarker
 
     class FunCallExpr : Expr
     {
-        public override string Name {get;set;}
+        public override string Name { get; set; }
         public FunCallExpr(string name)
         {
-            if (name == null)
-                throw new ArgumentNullException(nameof(name));
-
             this.Name = name;
         }
     }
 
     abstract class Statement
     {
-        public Expr Expr {get;set;}
+        public Expr Expr { get; set; }
     }
 
     class Assignment : Statement
     {
-        public string Lval {get;set;}
+        public string Lval { get; set; }
         public Assignment(string lval, Expr expr)
         {
-            if (expr == null)
-                throw new ArgumentNullException(nameof(expr));
-            if (lval == null)
-                throw new ArgumentNullException(nameof(lval));
-
             this.Lval = lval;
             this.Expr = expr;
         }
@@ -100,16 +80,11 @@ namespace CompilerBenchmarker
 
     class VarDecl : Statement, IHasUsed
     {
-        public string Name {get;set;}
-        public bool Mut {get;set;}
-        public bool Used {get;set;}
+        public string Name { get; set; }
+        public bool Mut { get; set; }
+        public bool Used { get; set; }
         public VarDecl(string name, Expr expr)
         {
-            if (expr == null)
-                throw new ArgumentNullException(nameof(expr));
-            if (name == null)
-                throw new ArgumentNullException(nameof(name));
-
             this.Name = name;
             this.Expr = expr;
             this.Mut = false;
@@ -121,9 +96,6 @@ namespace CompilerBenchmarker
     {
         public Return(Expr expr)
         {
-            if (expr == null)
-                throw new ArgumentNullException(nameof(expr));
-
             this.Expr = expr;
         }
     }
@@ -132,28 +104,18 @@ namespace CompilerBenchmarker
     {
         public Print(Expr expr)
         {
-            if (expr == null)
-                throw new ArgumentNullException(nameof(expr));
-
             this.Expr = expr;
         }
     }
 
     class FunDecl : IHasUsed
     {
-        public string Name {get;set;}
-        public IList<Statement> Statements {get;set;}
-        public string ReturnType {get;set;}
-        public bool Used {get;set;}
+        public string Name { get; set; }
+        public IList<Statement> Statements { get; set; }
+        public string ReturnType { get; set; }
+        public bool Used { get; set; }
         public FunDecl(string name, IList<Statement> statements, string returnType)
         {
-            if (name == null)
-                throw new ArgumentNullException(nameof(name));
-            if (statements == null)
-                throw new ArgumentNullException(nameof(statements));
-            if (returnType == null)
-                throw new ArgumentNullException(nameof(returnType));
-
             this.Name = name;
             this.Statements = statements;
             this.ReturnType = returnType;
@@ -163,15 +125,10 @@ namespace CompilerBenchmarker
 
     class Program
     {
-        public FunDecl Main {get;set;}
-        public IList<FunDecl> Functions {get;set;}
+        public FunDecl Main { get; set; }
+        public IList<FunDecl> Functions { get; set; }
         public Program(FunDecl main, IList<FunDecl> functions)
         {
-            if (main == null)
-                throw new ArgumentNullException(nameof(main));
-            if (functions == null)
-                throw new ArgumentNullException(nameof(functions));
-
             this.Main = main;
             this.Functions = functions;
         }
@@ -179,10 +136,10 @@ namespace CompilerBenchmarker
 
     class Context
     {
-        Dictionary<string, IHasUsed> Env {get;set;} = new Dictionary<string, IHasUsed>();
-        int id {get;set;} = 0;
-        Context parent {get;set;}
-        Random random {get;set;}
+        Dictionary<string, IHasUsed> Env { get; set; } = new Dictionary<string, IHasUsed>();
+        int id { get; set; } = 0;
+        Context parent { get; set; }
+        Random random { get; set; }
 
         public Context(Context parent, Random random)
         {
@@ -271,14 +228,14 @@ namespace CompilerBenchmarker
             return forcedVarExpr(name);
         }
 
-        BinOp forcedRandomBinaryOp(Expr left, Expr right)
+        BinOpExpr forcedRandomBinaryOp(Expr left, Expr right)
         {
             //op = random.choice(["+", "-", "*", "|", "&", "^"]);
             var op = random.Choice(new[] {"|", "&", "^"});
-            return new BinOp(op, left, right);
+            return new BinOpExpr(op, left, right);
         }
 
-        BinOp randomBinaryOp()
+        BinOpExpr randomBinaryOp()
         {
             var left = randomExpr();
             var right = randomExpr();
@@ -380,9 +337,9 @@ namespace CompilerBenchmarker
 
     abstract class Lang
     {
-        protected virtual string ext {get;}
-        protected int indent {get;set;} = 0;
-        protected int extraIndent {get;set;} = 0;
+        protected virtual string ext { get; }
+        protected int indent { get; set; } = 0;
+        protected int extraIndent { get; set; } = 0;
 
         protected virtual Dictionary<string, string> operators => new Dictionary<string, string> {
             {"&", "&"},
@@ -415,9 +372,6 @@ namespace CompilerBenchmarker
 
         protected virtual void writeStatement(StreamWriter f, Statement statement)
         {
-            if (statement == null)
-                throw new ArgumentNullException(nameof(statement));
-
             if (statement is VarDecl)
                 writeVarDecl(f, statement as VarDecl);
             else if (statement is Assignment)
@@ -440,15 +394,12 @@ namespace CompilerBenchmarker
 
         protected virtual void writeExpr(StreamWriter f, Expr expr, bool needsParens = false)
         {
-            if (expr == null)
-                throw new ArgumentNullException(nameof(expr));
-
             if (expr is ConstExpr)
                 writeConstExpr(f, expr as ConstExpr, needsParens);
             else if (expr is VarExpr)
                 writeVarExpr(f, expr as VarExpr, needsParens);
-            else if (expr is BinOp)
-                writeBinOp(f, expr as BinOp, true);
+            else if (expr is BinOpExpr)
+                writeBinOp(f, expr as BinOpExpr, true);
             else if (expr is FunCallExpr)
                 writeFunCall(f, expr as FunCallExpr, needsParens);
             else
@@ -457,25 +408,16 @@ namespace CompilerBenchmarker
 
         protected virtual void writeConstExpr(StreamWriter f, ConstExpr expr, bool needsParens)
         {
-            if (expr == null)
-                throw new ArgumentNullException(nameof(expr));
-
             f.Write(expr.Val);
         }
 
         protected virtual void writeVarExpr(StreamWriter f, VarExpr expr, bool needsParens)
         {
-            if (expr == null)
-                throw new ArgumentNullException(nameof(expr));
-
             f.Write(expr.Name);
         }
 
-        protected virtual void writeBinOp(StreamWriter f, BinOp expr, bool needsParens)
+        protected virtual void writeBinOp(StreamWriter f, BinOpExpr expr, bool needsParens)
         {
-            if (expr == null)
-                throw new ArgumentNullException(nameof(expr));
-
             if (needsParens)
                 f.Write("(");
             writeExpr(f, expr.Left, needsParens);
@@ -487,9 +429,6 @@ namespace CompilerBenchmarker
 
         protected virtual void writeFunCall(StreamWriter f, FunCallExpr expr, bool needsParens)
         {
-            if (expr == null)
-                throw new ArgumentNullException(nameof(expr));
-
             f.Write($"{expr.Name}()");
         }
     }
@@ -504,9 +443,6 @@ namespace CompilerBenchmarker
 
         public override void WriteProgram(StreamWriter f, Program program)
         {
-            if (program == null)
-                throw new ArgumentNullException(nameof(program));
-
             f.Write("#include <cstdio>\n\n");
             foreach (var funDecl in program.Functions)
             {
@@ -518,9 +454,6 @@ namespace CompilerBenchmarker
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
-            if (funDecl == null)
-                throw new ArgumentNullException(nameof(funDecl));
-
             string optionalResult, typeName;
             if (funDecl.ReturnType == "")
             {
@@ -542,9 +475,6 @@ namespace CompilerBenchmarker
 
         protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
-            if (varDecl == null)
-                throw new ArgumentNullException(nameof(varDecl));
-
             writeIndent(f);
             f.Write("int ");
             writeLval(f, varDecl.Name);
@@ -555,9 +485,6 @@ namespace CompilerBenchmarker
 
         protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
-            if (assignment == null)
-                throw new ArgumentNullException(nameof(assignment));
-
             writeIndent(f);
             writeLval(f, assignment.Lval);
             f.Write(" = ");
@@ -567,9 +494,6 @@ namespace CompilerBenchmarker
 
         protected override void writeReturn(StreamWriter f, Return statement)
         {
-            if (statement == null)
-                throw new ArgumentNullException(nameof(statement));
-
             writeIndent(f);
             f.Write("return ");
             writeExpr(f, statement.Expr);
@@ -578,9 +502,6 @@ namespace CompilerBenchmarker
 
         protected override void writePrint(StreamWriter f, Print statement)
         {
-            if (statement == null)
-                throw new ArgumentNullException(nameof(statement));
-
             writeIndent(f);
             f.Write("printf(\"%i\\n\", ");
             writeExpr(f, statement.Expr);
@@ -594,9 +515,6 @@ namespace CompilerBenchmarker
 
         public override void WriteProgram(StreamWriter f, Program program)
         {
-            if (program == null)
-                throw new ArgumentNullException(nameof(program));
-
             f.Write("#include <stdio.h>\n\n");
             foreach (var funDecl in program.Functions)
             {
@@ -617,9 +535,6 @@ namespace CompilerBenchmarker
 
         public override void WriteProgram(StreamWriter f, Program program)
         {
-            if (program == null)
-                throw new ArgumentNullException(nameof(program));
-
             f.Write("import std.stdio;\n\n");
             foreach (var funDecl in program.Functions)
             {
@@ -631,9 +546,6 @@ namespace CompilerBenchmarker
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
-            if (funDecl == null)
-                throw new ArgumentNullException(nameof(funDecl));
-
             string optionalResult, typeName;
             if (funDecl.ReturnType == "")
             {
@@ -655,9 +567,6 @@ namespace CompilerBenchmarker
 
         protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
-            if (varDecl == null)
-                throw new ArgumentNullException(nameof(varDecl));
-
             writeIndent(f);
             f.Write("int ");
             writeLval(f, varDecl.Name);
@@ -668,9 +577,6 @@ namespace CompilerBenchmarker
 
         protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
-            if (assignment == null)
-                throw new ArgumentNullException(nameof(assignment));
-
             writeIndent(f);
             writeLval(f, assignment.Lval);
             f.Write(" = ");
@@ -680,9 +586,6 @@ namespace CompilerBenchmarker
 
         protected override void writeReturn(StreamWriter f, Return statement)
         {
-            if (statement == null)
-                throw new ArgumentNullException(nameof(statement));
-
             writeIndent(f);
             f.Write("return ");
             writeExpr(f, statement.Expr);
@@ -691,9 +594,6 @@ namespace CompilerBenchmarker
 
         protected override void writePrint(StreamWriter f, Print statement)
         {
-            if (statement == null)
-                throw new ArgumentNullException(nameof(statement));
-
             writeIndent(f);
             f.Write("writefln(\"%d\", ");
             writeExpr(f, statement.Expr);
@@ -711,9 +611,6 @@ namespace CompilerBenchmarker
 
         public override void WriteProgram(StreamWriter f, Program program)
         {
-            if (program == null)
-                throw new ArgumentNullException(nameof(program));
-
             f.Write("package main\n\n");
             f.Write("import \"fmt\"\n\n");
             foreach (var funDecl in program.Functions)
@@ -726,9 +623,6 @@ namespace CompilerBenchmarker
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
-            if (funDecl == null)
-                throw new ArgumentNullException(nameof(funDecl));
-
             string optionalResult, typeName;
             if (funDecl.ReturnType == "")
             {
@@ -750,9 +644,6 @@ namespace CompilerBenchmarker
 
         protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
-            if (varDecl == null)
-                throw new ArgumentNullException(nameof(varDecl));
-
             writeIndent(f);
             writeLval(f, varDecl.Name);
             f.Write(" := ");
@@ -762,9 +653,6 @@ namespace CompilerBenchmarker
 
         protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
-            if (assignment == null)
-                throw new ArgumentNullException(nameof(assignment));
-
             writeIndent(f);
             writeLval(f, assignment.Lval);
             f.Write(" = ");
@@ -774,9 +662,6 @@ namespace CompilerBenchmarker
 
         protected override void writeReturn(StreamWriter f, Return statement)
         {
-            if (statement == null)
-                throw new ArgumentNullException(nameof(statement));
-
             writeIndent(f);
             f.Write("return ");
             writeExpr(f, statement.Expr);
@@ -785,9 +670,6 @@ namespace CompilerBenchmarker
 
         protected override void writePrint(StreamWriter f, Print statement)
         {
-            if (statement == null)
-                throw new ArgumentNullException(nameof(statement));
-
             writeIndent(f);
             f.Write("fmt.Printf(\"%d\\n\", ");
             writeExpr(f, statement.Expr);
@@ -811,9 +693,6 @@ namespace CompilerBenchmarker
 
         public override void WriteProgram(StreamWriter f, Program program)
         {
-            if (program == null)
-                throw new ArgumentNullException(nameof(program));
-
             f.Write("program main;\n\n");
             foreach (var funDecl in program.Functions)
             {
@@ -825,9 +704,6 @@ namespace CompilerBenchmarker
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
-            if (funDecl == null)
-                throw new ArgumentNullException(nameof(funDecl));
-
             string funName;
             string typeName;
             if (!main)
@@ -856,9 +732,6 @@ namespace CompilerBenchmarker
 
         protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
-            if (varDecl == null)
-                throw new ArgumentNullException(nameof(varDecl));
-
             writeIndent(f);
             writeLval(f, varDecl.Name);
             f.Write(" := ");
@@ -868,9 +741,6 @@ namespace CompilerBenchmarker
 
         protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
-            if (assignment == null)
-                throw new ArgumentNullException(nameof(assignment));
-
             writeIndent(f);
             writeLval(f, assignment.Lval);
             f.Write(" := ");
@@ -880,9 +750,6 @@ namespace CompilerBenchmarker
 
         protected override void writeReturn(StreamWriter f, Return statement)
         {
-            if (statement == null)
-                throw new ArgumentNullException(nameof(statement));
-
             writeIndent(f);
             writeLval(f, statement.Expr.Name);
             f.Write(" := ");
@@ -892,9 +759,6 @@ namespace CompilerBenchmarker
 
         protected override void writePrint(StreamWriter f, Print statement)
         {
-            if (statement == null)
-                throw new ArgumentNullException(nameof(statement));
-
             writeIndent(f);
             f.Write("writeln(");
             writeExpr(f, statement.Expr);
@@ -912,9 +776,6 @@ namespace CompilerBenchmarker
 
         public override void WriteProgram(StreamWriter f, Program program)
         {
-            if (program == null)
-                throw new ArgumentNullException(nameof(program));
-
             f.Write("#![allow(unused_parens)]\n\n");
             foreach (var funDecl in program.Functions)
             {
@@ -926,9 +787,6 @@ namespace CompilerBenchmarker
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
-            if (funDecl == null)
-                throw new ArgumentNullException(nameof(funDecl));
-
             string optionalResult;
             string funName, typeName;
             if (funDecl.ReturnType == "")
@@ -951,9 +809,6 @@ namespace CompilerBenchmarker
 
         protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
-            if (varDecl == null)
-                throw new ArgumentNullException(nameof(varDecl));
-
             writeIndent(f);
             f.Write("let ");
             if (varDecl.Mut)
@@ -967,9 +822,6 @@ namespace CompilerBenchmarker
 
         protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
-            if (assignment == null)
-                throw new ArgumentNullException(nameof(assignment));
-
             writeIndent(f);
             writeLval(f, assignment.Lval);
             f.Write(" = ");
@@ -979,9 +831,6 @@ namespace CompilerBenchmarker
 
         protected override void writeReturn(StreamWriter f, Return statement)
         {
-            if (statement == null)
-                throw new ArgumentNullException(nameof(statement));
-
             writeIndent(f);
             writeExpr(f, statement.Expr);
             f.Write("\n");
@@ -989,9 +838,6 @@ namespace CompilerBenchmarker
 
         protected override void writePrint(StreamWriter f, Print statement)
         {
-            if (statement == null)
-                throw new ArgumentNullException(nameof(statement));
-
             writeIndent(f);
             f.Write("println!(\"{}\", ");
             writeExpr(f, statement.Expr);
@@ -1015,9 +861,6 @@ namespace CompilerBenchmarker
 
         public override void WriteProgram(StreamWriter f, Program program)
         {
-            if (program == null)
-                throw new ArgumentNullException(nameof(program));
-
             foreach (var funDecl in program.Functions)
             {
                 writeFunDecl(f, funDecl);
@@ -1028,9 +871,6 @@ namespace CompilerBenchmarker
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
-            if (funDecl == null)
-                throw new ArgumentNullException(nameof(funDecl));
-
             string optionalResult, typeName;
             if (funDecl.ReturnType == "")
             {
@@ -1053,9 +893,6 @@ namespace CompilerBenchmarker
 
         protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
-            if (varDecl == null)
-                throw new ArgumentNullException(nameof(varDecl));
-
             writeIndent(f);
             f.Write("let ");
             writeLval(f, varDecl.Name);
@@ -1066,9 +903,6 @@ namespace CompilerBenchmarker
 
         protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
-            if (assignment == null)
-                throw new ArgumentNullException(nameof(assignment));
-
             writeIndent(f);
             f.Write("let ");
             writeLval(f, assignment.Lval);
@@ -1079,9 +913,6 @@ namespace CompilerBenchmarker
 
         protected override void writeReturn(StreamWriter f, Return statement)
         {
-            if (statement == null)
-                throw new ArgumentNullException(nameof(statement));
-
             writeIndent(f);
             writeExpr(f, statement.Expr);
             f.Write("\n");
@@ -1089,9 +920,6 @@ namespace CompilerBenchmarker
 
         protected override void writePrint(StreamWriter f, Print statement)
         {
-            if (statement == null)
-                throw new ArgumentNullException(nameof(statement));
-
             writeIndent(f);
             f.Write("Printf.printf \"%i\\n\" (");
             writeExpr(f, statement.Expr);
@@ -1115,9 +943,6 @@ namespace CompilerBenchmarker
 
         public override void WriteProgram(StreamWriter f, Program program)
         {
-            if (program == null)
-                throw new ArgumentNullException(nameof(program));
-
             foreach (var funDecl in program.Functions)
             {
                 writeFunDecl(f, funDecl);
@@ -1128,9 +953,6 @@ namespace CompilerBenchmarker
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
-            if (funDecl == null)
-                throw new ArgumentNullException(nameof(funDecl));
-
             string optionalResult, typeName;
             if (funDecl.ReturnType == "")
             {
@@ -1153,9 +975,6 @@ namespace CompilerBenchmarker
 
         protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
-            if (varDecl == null)
-                throw new ArgumentNullException(nameof(varDecl));
-
             writeIndent(f);
             f.Write("let ");
             writeLval(f, varDecl.Name);
@@ -1166,9 +985,6 @@ namespace CompilerBenchmarker
 
         protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
-            if (assignment == null)
-                throw new ArgumentNullException(nameof(assignment));
-
             writeIndent(f);
             f.Write("let ");
             writeLval(f, assignment.Lval);
@@ -1179,9 +995,6 @@ namespace CompilerBenchmarker
 
         protected override void writeReturn(StreamWriter f, Return statement)
         {
-            if (statement == null)
-                throw new ArgumentNullException(nameof(statement));
-
             writeIndent(f);
             writeExpr(f, statement.Expr);
             f.Write("\n");
@@ -1189,9 +1002,6 @@ namespace CompilerBenchmarker
 
         protected override void writePrint(StreamWriter f, Print statement)
         {
-            if (statement == null)
-                throw new ArgumentNullException(nameof(statement));
-
             writeIndent(f);
             f.Write("printfn \"%i\\n\" (");
             writeExpr(f, statement.Expr);
@@ -1216,9 +1026,6 @@ namespace CompilerBenchmarker
 
         public override void WriteProgram(StreamWriter f, Program program)
         {
-            if (program == null)
-                throw new ArgumentNullException(nameof(program));
-
             f.Write("import GHC.Int\n"
                     + "import Data.Bits\n"
                     + "import Text.Printf\n\n");
@@ -1239,9 +1046,6 @@ namespace CompilerBenchmarker
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
-            if (funDecl == null)
-                throw new ArgumentNullException(nameof(funDecl));
-
             string fund;
             if (main)
             {
@@ -1266,9 +1070,6 @@ namespace CompilerBenchmarker
 
         protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
-            if (varDecl == null)
-                throw new ArgumentNullException(nameof(varDecl));
-
             writeIndent(f);
             f.Write("let ");
             writeLval(f, varDecl.Name);
@@ -1279,9 +1080,6 @@ namespace CompilerBenchmarker
 
         protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
-            if (assignment == null)
-                throw new ArgumentNullException(nameof(assignment));
-
             if (assignment.Expr is VarExpr && assignment.Lval == assignment.Expr.Name)
                 return;
 
@@ -1295,9 +1093,6 @@ namespace CompilerBenchmarker
 
         protected override void writeReturn(StreamWriter f, Return statement)
         {
-            if (statement == null)
-                throw new ArgumentNullException(nameof(statement));
-
             writeIndent(f);
             writeExpr(f, statement.Expr);
             f.Write("\n");
@@ -1305,9 +1100,6 @@ namespace CompilerBenchmarker
 
         protected override void writePrint(StreamWriter f, Print statement)
         {
-            if (statement == null)
-                throw new ArgumentNullException(nameof(statement));
-
             writeIndent(f);
             f.Write("printf \"%i\\n\" (");
             writeExpr(f, statement.Expr);
@@ -1326,9 +1118,6 @@ namespace CompilerBenchmarker
 
         public override void WriteProgram(StreamWriter f, Program program)
         {
-            if (program == null)
-                throw new ArgumentNullException(nameof(program));
-
             f.Write("using System;\nnamespace CompilationSpeedTest\n{\n");
             indent += 1;
             writeIndent(f);
@@ -1352,9 +1141,6 @@ namespace CompilerBenchmarker
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
-            if (funDecl == null)
-                throw new ArgumentNullException(nameof(funDecl));
-
             string optionalResult, typeName;
             if (funDecl.ReturnType == "")
             {
@@ -1385,9 +1171,6 @@ namespace CompilerBenchmarker
 
         protected override void writePrint(StreamWriter f, Print statement)
         {
-            if (statement == null)
-                throw new ArgumentNullException(nameof(statement));
-
             writeIndent(f);
             f.Write("Console.WriteLine(\"{i}\\n\", ");
             writeExpr(f, statement.Expr);
@@ -1401,9 +1184,6 @@ namespace CompilerBenchmarker
 
         public override void WriteProgram(StreamWriter f, Program program)
         {
-            if (program == null)
-                throw new ArgumentNullException(nameof(program));
-
             f.Write("package CompilationSpeedTest;\n\n");
             writeIndent(f);
             f.Write("class Program\n");
@@ -1424,9 +1204,6 @@ namespace CompilerBenchmarker
 
         protected override void writePrint(StreamWriter f, Print statement)
         {
-            if (statement == null)
-                throw new ArgumentNullException(nameof(statement));
-
             writeIndent(f);
             f.Write("System.out.format(\"%d\\n\", ");
             writeExpr(f, statement.Expr);
@@ -1450,9 +1227,6 @@ namespace CompilerBenchmarker
 
         public override void WriteProgram(StreamWriter f, Program program)
         {
-            if (program == null)
-                throw new ArgumentNullException(nameof(program));
-
             foreach (var funDecl in program.Functions)
             {
                 writeFunDecl(f, funDecl);
@@ -1463,9 +1237,6 @@ namespace CompilerBenchmarker
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
-            if (funDecl == null)
-                throw new ArgumentNullException(nameof(funDecl));
-
             string optionalResult, typeName;
             if (funDecl.ReturnType == "")
             {
@@ -1487,9 +1258,6 @@ namespace CompilerBenchmarker
 
         protected override void writeVarDecl(StreamWriter f, VarDecl varDecl)
         {
-            if (varDecl == null)
-                throw new ArgumentNullException(nameof(varDecl));
-
             writeIndent(f);
             if (varDecl.Mut)
                 f.Write("var ");
@@ -1509,9 +1277,6 @@ namespace CompilerBenchmarker
 
         protected override void writeAssignment(StreamWriter f, Assignment assignment)
         {
-            if (assignment == null)
-                throw new ArgumentNullException(nameof(assignment));
-
             writeIndent(f);
             writeLval(f, assignment.Lval);
             f.Write(" = ");
@@ -1521,9 +1286,6 @@ namespace CompilerBenchmarker
 
         protected override void writeReturn(StreamWriter f, Return statement)
         {
-            if (statement == null)
-                throw new ArgumentNullException(nameof(statement));
-
             writeIndent(f);
             f.Write("return ");
             writeExpr(f, statement.Expr);
@@ -1532,9 +1294,6 @@ namespace CompilerBenchmarker
 
         protected override void writePrint(StreamWriter f, Print statement)
         {
-            if (statement == null)
-                throw new ArgumentNullException(nameof(statement));
-
             writeIndent(f);
             f.Write("print(");
             writeExpr(f, statement.Expr);
@@ -1554,9 +1313,6 @@ namespace CompilerBenchmarker
 
         public override void WriteProgram(StreamWriter f, Program program)
         {
-            if (program == null)
-                throw new ArgumentNullException(nameof(program));
-
             f.Write("object CompilerBenchmarker {\n");
             writeIndent(f);
             f.Write("\n");
@@ -1574,9 +1330,6 @@ namespace CompilerBenchmarker
 
         protected override void writeFunDecl(StreamWriter f, FunDecl funDecl, bool main = false)
         {
-            if (funDecl == null)
-                throw new ArgumentNullException(nameof(funDecl));
-
             string optionalResult, typeName;
             if (funDecl.ReturnType == "")
             {
