@@ -183,13 +183,13 @@ namespace CompilerBenchmarker
             var codeExt = compilers
                 .Select(x => $"\\d.{x.Extension}$")
                 .Distinct();
-            var notCodeExt = $"{codeExt.Join("|")}|.csv$|.txt$";
+            var notCodeExt = $"{codeExt.Join("|")}|.csv$|.txt|.csproj$";
             Action<FileInfo> toDelete = fileInfo => {
                 if (!Regex.IsMatch(fileInfo.FullName, notCodeExt))
                     File.Delete(fileInfo.FullName);
             };
 
-            var codeGen = new CodeGen();
+            var codeGen = new CompilerBenchmarker2.CodeGen2();
             var failed = new HashSet<Compiler>(new CompilerComparer());
             // todo: record compiler failure reason
             foreach (var langCompilers in compilers.GroupBy(x => x.Language))
@@ -203,14 +203,15 @@ namespace CompilerBenchmarker
                     Console.Write($"- Generating {langCompilers.Key} with {numFun} functions.. ");
                     // todo: don't use existing files by default, just have the option to
                     var codeFilePath = $"test_{langCompilers.First().Extension}_{numFun}.{langCompilers.First().Extension}";
-                    if (File.Exists(codeFilePath))
-                    {
-                        Console.Write("Exists already.");
-                    }
-                    else
-                    {
-                        codeGen.WriteLang(langCompilers.Key, numFun, codeFilePath);
-                    }
+                    // if (File.Exists(codeFilePath))
+                    // {
+                    //     Console.Write("Exists already.");
+                    // }
+                    // else
+                    // {
+                    //     codeGen.WriteLang(langCompilers.Key, numFun, codeFilePath);
+                    // }
+                    codeGen.WriteLang(langCompilers.Key, numFun, codeFilePath);
                     Console.WriteLine();
 
                     foreach (var compiler in langCompilers)
@@ -271,57 +272,48 @@ namespace CompilerBenchmarker
 
         static void Main(string[] args)
         {
-            int numberAtStart = 5000;
-            int numberOfSteps = 10;
-            int stepIncreaseNumber = 5000;
-
-            // todo: good command-line options library for C#?
-            var helpInfo = new Dictionary<string, int>
-            {
-                { "numberAtStart", numberAtStart },
-                { "numberOfSteps", numberOfSteps },
-                { "increaseOnStep", stepIncreaseNumber }
-                // options todo:
-                // - cleanup on/off (on by default)
-                // - csv file name (timestamped default)
-                // - additional compilers or options somehow
-            };
+            int numberAtStart = 10;
+            int numberOfSteps = 1;
+            int stepIncreaseNumber = 0;
+            // int numberAtStart = 5000;
+            // int numberOfSteps = 10;
+            // int stepIncreaseNumber = 5000;
 
             try
             {
                 var compilers = new List<Compiler>
                 {
                     // Native
-                    new Compiler("C",         "c",      "gcc", "--version", "-O2"), // optimized
-                    new Compiler("C",         "c",      "gcc", "--version"),        // default
-                    new Compiler("C++",     "cpp",      "g++", "--version", "-O2"),
-                    new Compiler("C++",     "cpp",      "g++", "--version"),
-                    new Compiler("C++",     "cpp",    "clang", "--version", "-O2"),
-                    new Compiler("C++",     "cpp",    "clang", "--version"),
-                    new Compiler("Rust",     "rs",    "rustc", "--version", "-C opt-level=2"),
-                    new Compiler("Rust",     "rs",    "rustc", "--version"),
-                    new Compiler("D",         "d",      "dmd", "--version", "-O"),
-                    new Compiler("D",         "d",      "dmd", "--version"),
-                    new Compiler("D",         "d",      "gdc", "--version", "-O"),
-                    new Compiler("D",         "d",      "gdc", "--version"),
-                    new Compiler("D",         "d",     "ldc2", "--version", "-O"),
-                    new Compiler("D",         "d",     "ldc2", "--version"),
-                    new Compiler("OCaml",    "ml", "ocamlopt", "--version", "-O2"),
-                    new Compiler("OCaml",    "ml", "ocamlopt", "--version"),
-                    new Compiler("Haskell",  "hs",      "ghc", "--version", "-O"),
-                    new Compiler("Haskell",  "hs",      "ghc", "--version"),
-                    new Compiler("Go",       "go",       "go",   "version", "build"),
+                    // new Compiler("C",         "c",      "gcc", "--version", "-O2"), // optimized
+                    // new Compiler("C",         "c",      "gcc", "--version"),        // default
+                    // new Compiler("C++",     "cpp",      "g++", "--version", "-O2"),
+                    // new Compiler("C++",     "cpp",      "g++", "--version"),
+                    // new Compiler("C++",     "cpp",    "clang", "--version", "-O2"),
+                    // new Compiler("C++",     "cpp",    "clang", "--version"),
+                    // new Compiler("Rust",     "rs",    "rustc", "--version", "-C opt-level=2"),
+                    // new Compiler("Rust",     "rs",    "rustc", "--version"),
+                    // new Compiler("D",         "d",      "dmd", "--version", "-O"),
+                    // new Compiler("D",         "d",      "dmd", "--version"),
+                    // new Compiler("D",         "d",      "gdc", "--version", "-O"),
+                    // new Compiler("D",         "d",      "gdc", "--version"),
+                    // new Compiler("D",         "d",     "ldc2", "--version", "-O"),
+                    // new Compiler("D",         "d",     "ldc2", "--version"),
+                    // new Compiler("OCaml",    "ml", "ocamlopt", "--version", "-O2"),
+                    // new Compiler("OCaml",    "ml", "ocamlopt", "--version"),
+                    // new Compiler("Haskell",  "hs",      "ghc", "--version", "-O"),
+                    // new Compiler("Haskell",  "hs",      "ghc", "--version"),
+                    // new Compiler("Go",       "go",       "go",   "version", "build"),
                     // VM
-                    new Compiler("CSharp",   "cs",      "csc", "/version", "/o", miscArguments: "/nowarn:1717"),
-                    new Compiler("CSharp",   "cs",      "csc", "/version",       miscArguments: "/nowarn:1717"),
-                    new Compiler("FSharp",   "fs",  "fsharpc",   "--help", "-O", miscArguments: "--nologo"), // fsharpc does not have a version flag?
-                    new Compiler("FSharp",   "fs",  "fsharpc",   "--help",       miscArguments: "--nologo"), // fsharpc does not have a version flag?
-                    new Compiler("Java",   "java",    "javac", "-version",       miscArguments: "-J-Xmx4096M -J-Xms64M"),
-                    new Compiler("Scala", "scala",   "scalac", "-version", "-optimise"), // modified to use Java -Xmx4096M -Xms64M -Xss4m
-                    new Compiler("Scala", "scala",   "scalac", "-version"),              // modified to use Java -Xmx4096M -Xms64M -Xss4m
-                    new Compiler("Scala", "scala",     "dotc", "-version", "-optimise"), // modified to use Java -Xmx4096M -Xss4m
-                    new Compiler("Scala", "scala",     "dotc", "-version"),              // modified to use Java -Xmx4096M -Xss4m
-                    new Compiler("Kotlin",   "kt",  "kotlinc", "-version"),              // modified to use Java -Xmx4096M -Xms64M -Xss4m
+                    // new Compiler("CSharp",   "cs",   "RunCsc", "/version", "/o", miscArguments: "/nowarn:1717"),
+                    new Compiler("CSharp",   "cs",      "dotnet", "/version",       miscArguments: "build /nowarn:1717"),
+                    // new Compiler("FSharp",   "fs",  "fsharpc",   "--help", "-O", miscArguments: "--nologo"), // fsharpc does not have a version flag?
+                    // new Compiler("FSharp",   "fs",  "fsharpc",   "--help",       miscArguments: "--nologo"), // fsharpc does not have a version flag?
+                    // new Compiler("Java",   "java",    "javac", "-version",       miscArguments: "-J-Xmx4096M -J-Xms64M"),
+                    // new Compiler("Scala", "scala",   "scalac", "-version", "-optimise"), // modified to use Java -Xmx4096M -Xms64M -Xss4m
+                    // new Compiler("Scala", "scala",   "scalac", "-version"),              // modified to use Java -Xmx4096M -Xms64M -Xss4m
+                    // new Compiler("Scala", "scala",     "dotc", "-version", "-optimise"), // modified to use Java -Xmx4096M -Xss4m
+                    // new Compiler("Scala", "scala",     "dotc", "-version"),              // modified to use Java -Xmx4096M -Xss4m
+                    // new Compiler("Kotlin",   "kt",  "kotlinc", "-version"),              // modified to use Java -Xmx4096M -Xms64M -Xss4m
                 };
 
                 foreach (var c in compilers.GroupBy(x => x.Exe).Select(x => x.First()))
