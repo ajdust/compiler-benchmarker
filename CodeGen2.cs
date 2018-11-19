@@ -336,7 +336,6 @@ namespace CompilerBenchmarker2
         IEnumerable<string> GetProgramLines(Program program);
     }
 
-    enum CallStyle { ML, Imperative }
     enum ReturnStyle { Expression, RequiredReturn }
 
     abstract class BaseImperativeLang : ILang
@@ -376,7 +375,7 @@ namespace CompilerBenchmarker2
                 case BinaryOperation binOp:
                     var left = GetExpression(binOp.LeftOperand);
                     var right = GetExpression(binOp.RightOperand);
-                    return $"{left} {GetBinaryOperator(binOp.Operator)} {right}";
+                    return $"({left} {GetBinaryOperator(binOp.Operator)} {right})";
                 default: throw new ArgumentOutOfRangeException(nameof(expr));
             }
         }
@@ -409,10 +408,9 @@ namespace CompilerBenchmarker2
         protected virtual IEnumerable<string> GetFunctionDeclarationLines(FunctionDeclaration fun)
         {
             if (fun is MainFunctionDeclaration main)
-                yield return $"{MethodPrefix}{IntType} {Main}";
+                yield return $"{MethodPrefix}{IntType} {Main} {{";
             else
-                yield return $"{MethodPrefix}{IntType} {fun.FunctionName}()";
-            yield return "{";
+                yield return $"{MethodPrefix}{IntType} {fun.FunctionName}() {{";
             foreach (var statement in fun.Statements)
                 yield return $"    {GetStatement(statement)}";
             yield return "}";
@@ -441,13 +439,13 @@ namespace CompilerBenchmarker2
             yield return "    {";
             foreach (var fun in program.Functions)
             {
-                foreach (var lin in GetFunctionDeclarationLines(fun))
-                    yield return $"        {lin}";
+                foreach (var line in GetFunctionDeclarationLines(fun))
+                    yield return $"        {line}";
                 yield return "";
             }
 
-            foreach (var lin in GetFunctionDeclarationLines(program.Main))
-                yield return $"        {lin}";
+            foreach (var line in GetFunctionDeclarationLines(program.Main))
+                yield return $"        {line}";
 
             yield return "    }";
             yield return "}";
@@ -468,17 +466,16 @@ namespace CompilerBenchmarker2
         {
             yield return "package GeneratedCode;";
             yield return "";
-            yield return "static class GeneratedFunctions";
-            yield return "{";
+            yield return "class GeneratedFunctions {";
             foreach (var fun in program.Functions)
             {
-                foreach (var lin in GetFunctionDeclarationLines(fun))
-                    yield return $"    {lin}";
+                foreach (var line in GetFunctionDeclarationLines(fun))
+                    yield return $"    {line}";
                 yield return "";
             }
 
-            foreach (var lin in GetFunctionDeclarationLines(program.Main))
-                yield return $"    {lin}";
+            foreach (var line in GetFunctionDeclarationLines(program.Main))
+                yield return $"    {line}";
 
             yield return "}";
         }
@@ -488,7 +485,7 @@ namespace CompilerBenchmarker2
     {
         public override string Extension => "c";
 
-        protected override string PrintFunctionName => "printf";
+        protected override string PrintFunctionName => "CUSTOM_PRINT";
 
         protected override string Main => "main(void)";
 
@@ -498,15 +495,17 @@ namespace CompilerBenchmarker2
         {
             yield return "#include <stdio.h>";
             yield return "";
+            yield return @"#define CUSTOM_PRINT(m) printf(""%i"",m)";
+            yield return "";
             foreach (var fun in program.Functions)
             {
-                foreach (var lin in GetFunctionDeclarationLines(fun))
-                    yield return $"    {lin}";
+                foreach (var line in GetFunctionDeclarationLines(fun))
+                    yield return line;
                 yield return "";
             }
 
-            foreach (var lin in GetFunctionDeclarationLines(program.Main))
-                yield return $"    {lin}";
+            foreach (var line in GetFunctionDeclarationLines(program.Main))
+                yield return line;
         }
     }
 
@@ -526,13 +525,13 @@ namespace CompilerBenchmarker2
             yield return "";
             foreach (var fun in program.Functions)
             {
-                foreach (var lin in GetFunctionDeclarationLines(fun))
-                    yield return $"    {lin}";
+                foreach (var line in GetFunctionDeclarationLines(fun))
+                    yield return line;
                 yield return "";
             }
 
-            foreach (var lin in GetFunctionDeclarationLines(program.Main))
-                yield return $"    {lin}";
+            foreach (var line in GetFunctionDeclarationLines(program.Main))
+                yield return line;
         }
     }
 
@@ -552,13 +551,13 @@ namespace CompilerBenchmarker2
             yield return "";
             foreach (var fun in program.Functions)
             {
-                foreach (var lin in GetFunctionDeclarationLines(fun))
-                    yield return $"    {lin}";
+                foreach (var line in GetFunctionDeclarationLines(fun))
+                    yield return line;
                 yield return "";
             }
 
-            foreach (var lin in GetFunctionDeclarationLines(program.Main))
-                yield return $"    {lin}";
+            foreach (var line in GetFunctionDeclarationLines(program.Main))
+                yield return line;
         }
     }
 
@@ -572,19 +571,22 @@ namespace CompilerBenchmarker2
 
         protected override string MethodPrefix => "func ";
 
+        protected override string EndStatement => "";
+
         public override IEnumerable<string> GetProgramLines(Program program)
         {
+            yield return @"package main";
             yield return @"import(""fmt"")";
             yield return "";
             foreach (var fun in program.Functions)
             {
-                foreach (var lin in GetFunctionDeclarationLines(fun))
-                    yield return $"    {lin}";
+                foreach (var line in GetFunctionDeclarationLines(fun))
+                    yield return line;
                 yield return "";
             }
 
-            foreach (var lin in GetFunctionDeclarationLines(program.Main))
-                yield return $"    {lin}";
+            foreach (var line in GetFunctionDeclarationLines(program.Main))
+                yield return line;
         }
 
         protected override string GetStatement(IStatement statement)
@@ -604,18 +606,23 @@ namespace CompilerBenchmarker2
         protected override IEnumerable<string> GetFunctionDeclarationLines(FunctionDeclaration fun)
         {
             if (fun is MainFunctionDeclaration main)
-                yield return $"{MethodPrefix}{Main} {IntType}";
+            {
+                yield return $"{MethodPrefix}{Main} {{";
+                foreach (var statement in fun.Statements.Where(x => !(x is Return)))
+                    yield return $"    {GetStatement(statement)}";
+                yield return "}";
+            }
             else
-                yield return $"{MethodPrefix}{fun.FunctionName}() {IntType}";
-            yield return "{";
-            foreach (var statement in fun.Statements)
-                yield return $"    {GetStatement(statement)}";
-            yield return "}";
+            {
+                yield return $"{MethodPrefix}{fun.FunctionName}() {IntType} {{";
+                foreach (var statement in fun.Statements)
+                    yield return $"    {GetStatement(statement)}";
+                yield return "}";
+            }
         }
     }
 
     // todo add:
-    // round 1: c, c++, d, go, java,
     // round 2: scala, kotlin, ocaml,
     // round 3: fsharp, haskell, rust
 
@@ -627,18 +634,17 @@ namespace CompilerBenchmarker2
         {
             switch (lang.ToLower())
             {
-                // case "c++": return new CppLang();
-                // case "c": return new CLang();
-                // case "d": return new DLang();
-                // case "go": return new GoLang();
-                // case "pascal": return new PascalLang();
+                case "c++": return new CppLang();
+                case "c": return new CLang();
+                case "d": return new DLang();
+                case "go": return new GoLang();
                 // case "rust": return new RustLang();
                 // case "ocaml": return new OCamlLang();
                 // case "fsharp": return new FSharpLang();
                 case "csharp": return new CSharpLang();
                 // case "haskell": return new HaskellLang();
                 // case "kotlin": return new KotlinLang();
-                // case "java": return new JavaLang();
+                case "java": return new JavaLang();
                 // case "scala": return new ScalaLang();
                 default:
                     throw new ArgumentOutOfRangeException(nameof(lang),

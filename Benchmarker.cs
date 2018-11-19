@@ -154,13 +154,16 @@ namespace CompilerBenchmarker
         static TimeSpan? RunBenchmark(Compiler compiler, string codeFilePath, int numFun)
         {
             var isDotnet = compiler.Exe == "dotnet";
-            using (var p = Process.Start(compiler.Exe, "restore"))
+            if (isDotnet)
             {
-                p.WaitForExit();
-                if (p.ExitCode != 0)
+                using (var p = Process.Start(compiler.Exe, "restore"))
                 {
-                    Console.WriteLine($"  ! Compilation failed for '{compiler.Exe}'");
-                    return null;
+                    p.WaitForExit();
+                    if (p.ExitCode != 0)
+                    {
+                        Console.WriteLine($"  ! Compilation failed for '{compiler.Exe}'");
+                        return null;
+                    }
                 }
             }
 
@@ -200,7 +203,6 @@ namespace CompilerBenchmarker
                 .Distinct();
             var notCodeExt = $"{codeExt.Join("|")}|.csv$|.txt|.csproj$";
             Action<FileInfo> toDelete = fileInfo => {
-                Console.WriteLine("Considering: " + fileInfo.FullName);
                 if (!Regex.IsMatch(fileInfo.FullName, notCodeExt))
                     File.Delete(fileInfo.FullName);
             };
@@ -311,10 +313,12 @@ namespace CompilerBenchmarker
                     // Native
                     // new Compiler("C",         "c",      "gcc", "--version", "-O2"), // optimized
                     // new Compiler("C",         "c",      "gcc", "--version"),        // default
+                    // new Compiler("C",         "c",    "clang", "--version", "-O2"),
+                    // new Compiler("C",         "c",    "clang", "--version"),
                     // new Compiler("C++",     "cpp",      "g++", "--version", "-O2"),
                     // new Compiler("C++",     "cpp",      "g++", "--version"),
-                    // new Compiler("C++",     "cpp",    "clang", "--version", "-O2"),
-                    // new Compiler("C++",     "cpp",    "clang", "--version"),
+                    // new Compiler("C++",     "cpp",    "clang++", "--version", "-O2"),
+                    // new Compiler("C++",     "cpp",    "clang++", "--version"),
                     // new Compiler("Rust",     "rs",    "rustc", "--version", "-C opt-level=2"),
                     // new Compiler("Rust",     "rs",    "rustc", "--version"),
                     // new Compiler("D",         "d",      "dmd", "--version", "-O"),
@@ -330,10 +334,10 @@ namespace CompilerBenchmarker
                     // new Compiler("Go",       "go",       "go",   "version", "build"),
                     // VM
                     // new Compiler("CSharp",   "cs",   "RunCsc", "/version", "/o", miscArguments: "/nowarn:1717"),
-                    new Compiler("CSharp",   "cs",      "dotnet", "/version",       miscArguments: "build --no-restore"),
+                    // new Compiler("CSharp",   "cs",      "dotnet", "/version",       miscArguments: "build --no-restore"),
                     // new Compiler("FSharp",   "fs",  "fsharpc",   "--help", "-O", miscArguments: "--nologo"), // fsharpc does not have a version flag?
                     // new Compiler("FSharp",   "fs",  "fsharpc",   "--help",       miscArguments: "--nologo"), // fsharpc does not have a version flag?
-                    // new Compiler("Java",   "java",    "javac", "-version",       miscArguments: "-J-Xmx4096M -J-Xms64M"),
+                    new Compiler("Java",   "java",    "javac", "-version",       miscArguments: "-J-Xmx4096M -J-Xms64M"),
                     // new Compiler("Scala", "scala",   "scalac", "-version", "-optimise"), // modified to use Java -Xmx4096M -Xms64M -Xss4m
                     // new Compiler("Scala", "scala",   "scalac", "-version"),              // modified to use Java -Xmx4096M -Xms64M -Xss4m
                     // new Compiler("Scala", "scala",     "dotc", "-version", "-optimise"), // modified to use Java -Xmx4096M -Xss4m
