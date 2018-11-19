@@ -336,8 +336,6 @@ namespace CompilerBenchmarker2
         IEnumerable<string> GetProgramLines(Program program);
     }
 
-    enum ReturnStyle { Expression, RequiredReturn }
-
     abstract class BaseImperativeLang : ILang
     {
         public abstract string Extension { get; }
@@ -345,7 +343,6 @@ namespace CompilerBenchmarker2
         protected virtual string IntType => "int";
 
         // Rust, Kotlin, Scala, Swift, F# don't need "return"
-        protected virtual ReturnStyle ReturnStyle => ReturnStyle.RequiredReturn;
         protected abstract string Main { get; }
         protected abstract string PrintFunctionName { get; }
         protected abstract string MethodPrefix { get; }
@@ -393,11 +390,7 @@ namespace CompilerBenchmarker2
                     var vexpr = GetExpression(variableDeclaration.Initializer);
                     return $"{IntType} {vname} = {vexpr}{EndStatement}";
                 case Return ret:
-                    switch (ReturnStyle)
-                    {
-                        case ReturnStyle.Expression: return GetExpression(ret.Expr);
-                        default: return $"return {GetExpression(ret.Expr)}{EndStatement}";
-                    }
+                    return $"return {GetExpression(ret.Expr)}{EndStatement}";
                 case Print print:
                     var pvname = print.Variable.VariableName;
                         return $"{PrintFunctionName}({pvname}){EndStatement}";
@@ -622,6 +615,178 @@ namespace CompilerBenchmarker2
         }
     }
 
+    abstract class BaseExpressionLang : ILang
+    {
+        public abstract string Extension { get; }
+        protected abstract string IntType { get; }
+        protected abstract string Main { get; }
+        protected abstract string PrintFunctionName { get; }
+        protected abstract string MethodPrefix { get; }
+        protected abstract string AssignmentOperator { get; }
+        protected abstract string MutableDeclaration { get; }
+        protected abstract string ImmutableDeclaration { get; }
+        protected abstract bool ML { get; }
+        protected virtual string IndentSpaces => "    ";
+        protected virtual string FunctionWrapStart => "{";
+        protected virtual string FunctionWrapEnd => "}";
+
+        protected virtual string GetBinaryOperator(BinaryOperationOperator op)
+        {
+            switch (op)
+            {
+                case BinaryOperationOperator.BitAnd: return "&";
+                case BinaryOperationOperator.Minus: return "-";
+                case BinaryOperationOperator.Multiply: return "*";
+                case BinaryOperationOperator.BitOr: return "|";
+                case BinaryOperationOperator.Plus: return "+";
+                case BinaryOperationOperator.Xor: return "^";
+                default: throw new ArgumentOutOfRangeException(nameof(op));
+            }
+        }
+
+        protected virtual string GetExpression(IExpr expr)
+        {
+            switch (expr)
+            {
+                case Literal literal: return literal.Text;
+                case Variable variable: return variable.VariableName;
+                case FunctionCall functionCall:
+                    return $"{functionCall.FunctionName}{(ML ? " " : "")}()";
+                case BinaryOperation binOp:
+                    var left = GetExpression(binOp.LeftOperand);
+                    var right = GetExpression(binOp.RightOperand);
+                    return $"({left} {GetBinaryOperator(binOp.Operator)} {right})";
+                default: throw new ArgumentOutOfRangeException(nameof(expr));
+            }
+        }
+
+        protected virtual string GetStatement(IStatement statement, HashSet<Variable> assignedTo)
+        {
+            switch (statement)
+            {
+                case Assignment assignment:
+                    var aname = assignment.Variable.VariableName;
+                    var aexpr = GetExpression(assignment.AssignedExpression);
+                    return $"{aname} {AssignmentOperator} {aexpr}";
+                case VariableDeclaration variableDeclaration:
+                    var vname = variableDeclaration.Variable.VariableName;
+                    var vexpr = GetExpression(variableDeclaration.Initializer);
+                    return (assignedTo.Contains(variableDeclaration.Variable))
+                        ? $"{MutableDeclaration} {vname}: {IntType} = {vexpr}"
+                        : $"{ImmutableDeclaration} {vname}: {IntType} = {vexpr}";
+                case Return ret:
+                    return $"{GetExpression(ret.Expr)}";
+                case Print print:
+                    var pvname = print.Variable.VariableName;
+                        return $"{PrintFunctionName}{(ML ? " " : "")}({pvname})";
+                default: throw new ArgumentOutOfRangeException(nameof(statement));
+            }
+        }
+
+        protected virtual IEnumerable<string> GetFunctionDeclarationLines(FunctionDeclaration fun)
+        {
+            var assignedTo = new HashSet<Variable>(
+                fun.Statements.OfType<Assignment>().Select(a => a.Variable));
+
+            var isMain = fun is MainFunctionDeclaration;
+            if (isMain)
+                yield return $"{MethodPrefix} {Main} {FunctionWrapStart}";
+            else
+                yield return $"{MethodPrefix} {fun.FunctionName}(): {IntType} {FunctionWrapStart}";
+            foreach (var statement in fun.Statements)
+            {
+                if (isMain && statement is Return)
+                    continue;
+
+                yield return $"{IndentSpaces}{GetStatement(statement, assignedTo)}";
+            }
+            yield return FunctionWrapEnd;
+        }
+
+        public abstract IEnumerable<string> GetProgramLines(Program program);
+    }
+
+    class ScalaLang : BaseExpressionLang
+    {
+        public override string Extension => "scala";
+        protected override string IntType => "Int";
+        protected override string Main => "main(): Unit";
+        protected override string PrintFunctionName => "println";
+        protected override string MethodPrefix => "def";
+        protected override string AssignmentOperator => "=";
+        protected override string MutableDeclaration => "var";
+        protected override string ImmutableDeclaration => "val";
+        protected override bool ML => false;
+        protected override string IndentSpaces => "  ";
+        protected override string FunctionWrapStart => "= {";
+
+        public override IEnumerable<string> GetProgramLines(Program program)
+        {
+            yield return "object GeneratedFunctions {";
+            foreach (var fun in program.Functions)
+            {
+                foreach (var line in GetFunctionDeclarationLines(fun))
+                    yield return $"{IndentSpaces}{line}";
+                yield return "";
+            }
+
+            foreach (var line in GetFunctionDeclarationLines(program.Main))
+                yield return $"{IndentSpaces}{line}";
+
+            yield return "}";
+        }
+    }
+
+    class KotlinLang : BaseExpressionLang
+    {
+        public override string Extension => "kt";
+        protected override string IntType => "Int";
+        protected override string Main => "main()";
+        protected override string PrintFunctionName => "println";
+        protected override string MethodPrefix => "fun";
+        protected override string AssignmentOperator => "=";
+        protected override string MutableDeclaration => "var";
+        protected override string ImmutableDeclaration => "val";
+        protected override bool ML => false;
+
+        protected override string GetBinaryOperator(BinaryOperationOperator op)
+        {
+            switch (op)
+            {
+                case BinaryOperationOperator.BitAnd: return "and";
+                case BinaryOperationOperator.Minus: return "-";
+                case BinaryOperationOperator.Multiply: return "*";
+                case BinaryOperationOperator.BitOr: return "or";
+                case BinaryOperationOperator.Plus: return "+";
+                case BinaryOperationOperator.Xor: return "xor";
+                default: throw new ArgumentOutOfRangeException(nameof(op));
+            }
+        }
+
+        protected override string GetStatement(IStatement statement, HashSet<Variable> assignedTo)
+        {
+            return (statement is Return ret)
+                ? $"return {GetExpression(ret.Expr)}"
+                : base.GetStatement(statement, assignedTo);
+        }
+
+        public override IEnumerable<string> GetProgramLines(Program program)
+        {
+            yield return "class GeneratedFunctions {";
+            foreach (var fun in program.Functions)
+            {
+                foreach (var line in GetFunctionDeclarationLines(fun))
+                    yield return $"{IndentSpaces}{line}";
+                yield return "";
+            }
+
+            foreach (var line in GetFunctionDeclarationLines(program.Main))
+                yield return $"{IndentSpaces}{line}";
+
+            yield return "}";
+        }
+    }
+
     // todo add:
     // round 2: scala, kotlin, ocaml,
     // round 3: fsharp, haskell, rust
@@ -643,9 +808,9 @@ namespace CompilerBenchmarker2
                 // case "fsharp": return new FSharpLang();
                 case "csharp": return new CSharpLang();
                 // case "haskell": return new HaskellLang();
-                // case "kotlin": return new KotlinLang();
+                case "kotlin": return new KotlinLang();
                 case "java": return new JavaLang();
-                // case "scala": return new ScalaLang();
+                case "scala": return new ScalaLang();
                 default:
                     throw new ArgumentOutOfRangeException(nameof(lang),
                         $"{lang} is not supported by the code generation. So code it up!");
