@@ -22,7 +22,7 @@ namespace CompilerBenchmarker
             if (recursive)
             {
                 foreach (var dir in root.GetDirectories())
-                    Walk(dir, onFileDo, onDirDo);
+                    Walk(dir, onFileDo, onDirDo, recursive);
             }
 
             foreach (var file in root.GetFiles())

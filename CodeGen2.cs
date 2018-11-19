@@ -221,6 +221,19 @@ namespace CompilerBenchmarker2
             return new Assignment(to, expr);
         }
 
+        public static VariableDeclaration MainVariableDeclaration(
+            this Random random,
+            IReadOnlyCollection<Variable> declaredVariables,
+            IReadOnlyCollection<FunctionDeclaration> declaredFunctions)
+        {
+            IExpr expr = random.Expression(declaredVariables, declaredFunctions);
+
+            foreach (var v in declaredVariables)
+                expr = new BinaryOperation(expr, random.Operator(), v);
+
+            return new VariableDeclaration(new Variable("m"), expr);
+        }
+
         public static VariableDeclaration VariableDeclaration(
             this Random random,
             IReadOnlyCollection<Variable> declaredVariables,
@@ -280,7 +293,10 @@ namespace CompilerBenchmarker2
 
             if (isMain)
             {
-                statements.Add(random.Print(decVars));
+                // the main declaration prevents unused variable warnings in main
+                var m = random.MainVariableDeclaration(decVars, decFuns);
+                statements.Add(m);
+                statements.Add(new Print(m.Variable));
                 statements.Add(new Return(new Literal(0)));
                 return new MainFunctionDeclaration($"main", statements);
             }
@@ -312,12 +328,7 @@ namespace CompilerBenchmarker2
 
     #endregion
 
-
-/* Languages */
-/*
-    {
-
-    } */
+    #region Languages
 
     interface ILang
     {
@@ -330,13 +341,13 @@ namespace CompilerBenchmarker2
 
     abstract class BaseImperativeLang : ILang
     {
-        public string Extension => throw new NotImplementedException();
+        public abstract string Extension { get; }
         protected virtual string EndStatement => ";";
         protected virtual string IntType => "int";
 
         // Rust, Kotlin, Scala, Swift, F# don't need "return"
         protected virtual ReturnStyle ReturnStyle => ReturnStyle.RequiredReturn;
-        protected abstract string MainName { get; }
+        protected abstract string Main { get; }
         protected abstract string PrintFunctionName { get; }
         protected abstract string MethodPrefix { get; }
 
@@ -398,9 +409,9 @@ namespace CompilerBenchmarker2
         protected virtual IEnumerable<string> GetFunctionDeclarationLines(FunctionDeclaration fun)
         {
             if (fun is MainFunctionDeclaration main)
-                yield return $"{MethodPrefix} {IntType} {MainName}()";
+                yield return $"{MethodPrefix}{IntType} {Main}";
             else
-                yield return $"{MethodPrefix} {IntType} {fun.FunctionName}()";
+                yield return $"{MethodPrefix}{IntType} {fun.FunctionName}()";
             yield return "{";
             foreach (var statement in fun.Statements)
                 yield return $"    {GetStatement(statement)}";
@@ -412,15 +423,18 @@ namespace CompilerBenchmarker2
 
     class CSharpLang : BaseImperativeLang
     {
+        public override string Extension => "cs";
+
         protected override string PrintFunctionName => "Console.WriteLine";
 
-        protected override string MainName => "Main";
+        protected override string Main => "Main()";
 
-        protected override string MethodPrefix => "static";
+        protected override string MethodPrefix => "static ";
 
         public override IEnumerable<string> GetProgramLines(Program program)
         {
-            yield return "using System; // whooo";
+            yield return "using System;";
+            yield return "";
             yield return "namespace GeneratedCode";
             yield return "{";
             yield return "    static class GeneratedFunctions";
@@ -439,6 +453,173 @@ namespace CompilerBenchmarker2
             yield return "}";
         }
     }
+
+    class JavaLang : BaseImperativeLang
+    {
+        public override string Extension => "java";
+
+        protected override string PrintFunctionName => "System.out.println";
+
+        protected override string Main => "Main()";
+
+        protected override string MethodPrefix => "static ";
+
+        public override IEnumerable<string> GetProgramLines(Program program)
+        {
+            yield return "package GeneratedCode;";
+            yield return "";
+            yield return "static class GeneratedFunctions";
+            yield return "{";
+            foreach (var fun in program.Functions)
+            {
+                foreach (var lin in GetFunctionDeclarationLines(fun))
+                    yield return $"    {lin}";
+                yield return "";
+            }
+
+            foreach (var lin in GetFunctionDeclarationLines(program.Main))
+                yield return $"    {lin}";
+
+            yield return "}";
+        }
+    }
+
+    class CLang : BaseImperativeLang
+    {
+        public override string Extension => "c";
+
+        protected override string PrintFunctionName => "printf";
+
+        protected override string Main => "main(void)";
+
+        protected override string MethodPrefix => "";
+
+        public override IEnumerable<string> GetProgramLines(Program program)
+        {
+            yield return "#include <stdio.h>";
+            yield return "";
+            foreach (var fun in program.Functions)
+            {
+                foreach (var lin in GetFunctionDeclarationLines(fun))
+                    yield return $"    {lin}";
+                yield return "";
+            }
+
+            foreach (var lin in GetFunctionDeclarationLines(program.Main))
+                yield return $"    {lin}";
+        }
+    }
+
+    class CppLang : BaseImperativeLang
+    {
+        public override string Extension => "cpp";
+
+        protected override string PrintFunctionName => "std::cout << ";
+
+        protected override string Main => "main()";
+
+        protected override string MethodPrefix => "";
+
+        public override IEnumerable<string> GetProgramLines(Program program)
+        {
+            yield return "#include <iostream>";
+            yield return "";
+            foreach (var fun in program.Functions)
+            {
+                foreach (var lin in GetFunctionDeclarationLines(fun))
+                    yield return $"    {lin}";
+                yield return "";
+            }
+
+            foreach (var lin in GetFunctionDeclarationLines(program.Main))
+                yield return $"    {lin}";
+        }
+    }
+
+    class DLang : BaseImperativeLang
+    {
+        public override string Extension => "d";
+
+        protected override string PrintFunctionName => "writeln";
+
+        protected override string Main => "main()";
+
+        protected override string MethodPrefix => "";
+
+        public override IEnumerable<string> GetProgramLines(Program program)
+        {
+            yield return "import std.stdio;";
+            yield return "";
+            foreach (var fun in program.Functions)
+            {
+                foreach (var lin in GetFunctionDeclarationLines(fun))
+                    yield return $"    {lin}";
+                yield return "";
+            }
+
+            foreach (var lin in GetFunctionDeclarationLines(program.Main))
+                yield return $"    {lin}";
+        }
+    }
+
+    class GoLang : BaseImperativeLang
+    {
+        public override string Extension => "go";
+
+        protected override string PrintFunctionName => "fmt.Println";
+
+        protected override string Main => "main()";
+
+        protected override string MethodPrefix => "func ";
+
+        public override IEnumerable<string> GetProgramLines(Program program)
+        {
+            yield return @"import(""fmt"")";
+            yield return "";
+            foreach (var fun in program.Functions)
+            {
+                foreach (var lin in GetFunctionDeclarationLines(fun))
+                    yield return $"    {lin}";
+                yield return "";
+            }
+
+            foreach (var lin in GetFunctionDeclarationLines(program.Main))
+                yield return $"    {lin}";
+        }
+
+        protected override string GetStatement(IStatement statement)
+        {
+            if (statement is VariableDeclaration variableDeclaration)
+            {
+                var vname = variableDeclaration.Variable.VariableName;
+                var vexpr = GetExpression(variableDeclaration.Initializer);
+                return $"{vname} := {vexpr}{EndStatement}";
+            }
+            else
+            {
+                return base.GetStatement(statement);
+            }
+        }
+
+        protected override IEnumerable<string> GetFunctionDeclarationLines(FunctionDeclaration fun)
+        {
+            if (fun is MainFunctionDeclaration main)
+                yield return $"{MethodPrefix}{Main} {IntType}";
+            else
+                yield return $"{MethodPrefix}{fun.FunctionName}() {IntType}";
+            yield return "{";
+            foreach (var statement in fun.Statements)
+                yield return $"    {GetStatement(statement)}";
+            yield return "}";
+        }
+    }
+
+    // todo add:
+    // round 1: c, c++, d, go, java,
+    // round 2: scala, kotlin, ocaml,
+    // round 3: fsharp, haskell, rust
+
+    #endregion
 
     public class CodeGen2
     {

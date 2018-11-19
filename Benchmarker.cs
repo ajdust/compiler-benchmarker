@@ -153,9 +153,24 @@ namespace CompilerBenchmarker
     {
         static TimeSpan? RunBenchmark(Compiler compiler, string codeFilePath, int numFun)
         {
+            var isDotnet = compiler.Exe == "dotnet";
+            using (var p = Process.Start(compiler.Exe, "restore"))
+            {
+                p.WaitForExit();
+                if (p.ExitCode != 0)
+                {
+                    Console.WriteLine($"  ! Compilation failed for '{compiler.Exe}'");
+                    return null;
+                }
+            }
+
             var watch = new Stopwatch();
             watch.Start();
-            var args = compiler.MiscArguments + " " + compiler.OptimizeArguments + " " + codeFilePath;
+
+            var args = isDotnet
+                ? compiler.MiscArguments + " " + compiler.OptimizeArguments // project file should find the file
+                : compiler.MiscArguments + " " + compiler.OptimizeArguments + " " + codeFilePath;
+
             Console.WriteLine($"  - Running with {numFun}: {compiler.Exe} {args}");
             using (var p = Process.Start(compiler.Exe, args))
             {
@@ -185,23 +200,32 @@ namespace CompilerBenchmarker
                 .Distinct();
             var notCodeExt = $"{codeExt.Join("|")}|.csv$|.txt|.csproj$";
             Action<FileInfo> toDelete = fileInfo => {
+                Console.WriteLine("Considering: " + fileInfo.FullName);
                 if (!Regex.IsMatch(fileInfo.FullName, notCodeExt))
                     File.Delete(fileInfo.FullName);
             };
 
             var codeGen = new CompilerBenchmarker2.CodeGen2();
             var failed = new HashSet<Compiler>(new CompilerComparer());
+
             // todo: record compiler failure reason
             foreach (var langCompilers in compilers.GroupBy(x => x.Language))
             {
+                // create a directory to isolate files by number of functions
+
                 Console.WriteLine($"Benchmarking {langCompilers.Key}:");
                 for (int numFun = numberAtStart, step = 1;
                     step <= numberOfSteps;
                     step += 1, numFun += increaseOnStep)
                 {
-                    // generate file
+                    if (!Directory.Exists(numFun.ToString()))
+                    {
+                        Directory.CreateDirectory(numFun.ToString());
+                        File.Copy("CBT.csproj", $"{numFun}/CBT.csproj"); // todo: only do if dotnet project needed..
+                    }
+                    Directory.SetCurrentDirectory(numFun.ToString());
                     Console.Write($"- Generating {langCompilers.Key} with {numFun} functions.. ");
-                    // todo: don't use existing files by default, just have the option to
+
                     var codeFilePath = $"test_{langCompilers.First().Extension}_{numFun}.{langCompilers.First().Extension}";
                     // if (File.Exists(codeFilePath))
                     // {
@@ -231,10 +255,11 @@ namespace CompilerBenchmarker
                             : CompilerBenchmark.Failure(compiler, numFun);
 
                         // remove compiler artifacts
-                        FileWalker.Walk(Directory.GetCurrentDirectory(), toDelete, FileWalker.OnDirDoNothing);
+                        FileWalker.Walk(Directory.GetCurrentDirectory(), toDelete, FileWalker.OnDirDoNothing, true);
                     }
 
                     // todo: pass in file cleanup options
+                    Directory.SetCurrentDirectory("..");
                 }
             }
         }
@@ -305,7 +330,7 @@ namespace CompilerBenchmarker
                     // new Compiler("Go",       "go",       "go",   "version", "build"),
                     // VM
                     // new Compiler("CSharp",   "cs",   "RunCsc", "/version", "/o", miscArguments: "/nowarn:1717"),
-                    new Compiler("CSharp",   "cs",      "dotnet", "/version",       miscArguments: "build /nowarn:1717"),
+                    new Compiler("CSharp",   "cs",      "dotnet", "/version",       miscArguments: "build --no-restore"),
                     // new Compiler("FSharp",   "fs",  "fsharpc",   "--help", "-O", miscArguments: "--nologo"), // fsharpc does not have a version flag?
                     // new Compiler("FSharp",   "fs",  "fsharpc",   "--help",       miscArguments: "--nologo"), // fsharpc does not have a version flag?
                     // new Compiler("Java",   "java",    "javac", "-version",       miscArguments: "-J-Xmx4096M -J-Xms64M"),
