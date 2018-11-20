@@ -33,46 +33,18 @@ namespace CompilerBenchmarker2
     class FunctionCall : IExpr
     {
         public string FunctionName { get; }
-        public FunctionCall(string name) { FunctionName = name; }
+        public FunctionCall(string name) => FunctionName = name;
     }
 
     // e.g. '<expr> * <expr>'
-    enum BinaryOperationOperator { Plus, Minus, Multiply, BitAnd, BitOr, Xor }
+    enum BinaryOperator { Plus, Minus, Multiply, BitAnd, BitOr, Xor }
     class BinaryOperation : IExpr
     {
-        public static IEnumerable<Variable> EnumerateVariablesUsed(BinaryOperation binOp)
-        {
-            {
-                if (binOp.LeftOperand is Variable v)
-                {
-                    yield return v;
-                }
-                else if (binOp.LeftOperand is BinaryOperation subBinOp)
-                {
-                    foreach (var sv in EnumerateVariablesUsed(subBinOp))
-                        yield return sv;
-                }
-            }
-            {
-                if (binOp.RightOperand is Variable v)
-                {
-                    yield return v;
-                }
-                else if (binOp.RightOperand is BinaryOperation subBinOp)
-                {
-                    foreach (var sv in EnumerateVariablesUsed(subBinOp))
-                        yield return sv;
-                }
-            }
-        }
-
-        public IEnumerable<Variable> GetVariablesUsed() => EnumerateVariablesUsed(this);
-
         public IExpr LeftOperand { get; }
         public IExpr RightOperand { get; }
-        public BinaryOperationOperator Operator { get; }
+        public BinaryOperator Operator { get; }
 
-        public BinaryOperation(IExpr left, BinaryOperationOperator op, IExpr right)
+        public BinaryOperation(IExpr left, BinaryOperator op, IExpr right)
         {
             LeftOperand = left;
             Operator = op;
@@ -108,14 +80,14 @@ namespace CompilerBenchmarker2
     class Return : IStatement
     {
         public IExpr Expr { get; }
-        public Return(IExpr expr) { Expr = expr; }
+        public Return(IExpr expr) => Expr = expr;
     }
 
     // e.g. 'print(myVariableName)'
     class Print : IStatement
     {
         public Variable Variable { get; }
-        public Print(Variable variable) { Variable = variable; }
+        public Print(Variable variable) => Variable = variable;
     }
 
     interface IFunctionDeclaration {}
@@ -158,24 +130,22 @@ namespace CompilerBenchmarker2
 
     #region Program Generator
 
-    // todo: how to incorporate const/mut (C++, C, Rust, F#, Scala, etc.)
-    // todo: how to incorporate Rust borrow checker (no reusing variable)
     static class ProgramGenerator
     {
         public static bool TrueOrFalse(this Random r) => r.Next(1, 3) == 1;
         public static T From<T>(this Random r, IReadOnlyCollection<T> collection) =>
             collection.ElementAt(r.Next(0, collection.Count));
 
-        public static BinaryOperationOperator Operator(this Random random)
+        public static BinaryOperator Operator(this Random random)
         {
             switch (random.Next(1, 6))
             {
-                case 1: return BinaryOperationOperator.BitAnd;
-                case 2: return BinaryOperationOperator.Minus;
-                case 3: return BinaryOperationOperator.Multiply;
-                case 4: return BinaryOperationOperator.BitOr;
-                case 5: return BinaryOperationOperator.Plus;
-                default: return BinaryOperationOperator.Xor;
+                case 1: return BinaryOperator.BitAnd;
+                case 2: return BinaryOperator.Minus;
+                case 3: return BinaryOperator.Multiply;
+                case 4: return BinaryOperator.BitOr;
+                case 5: return BinaryOperator.Plus;
+                default: return BinaryOperator.Xor;
             }
         }
 
@@ -218,6 +188,9 @@ namespace CompilerBenchmarker2
             {
                 expr = random.Expression(declaredVariables, declaredFunctions);
             }
+
+            // ensure all initializers are used; e.g. no 'int a = 10; a = 20;'
+            expr = new BinaryOperation(to, random.Operator(), expr);
             return new Assignment(to, expr);
         }
 
@@ -347,16 +320,16 @@ namespace CompilerBenchmarker2
         protected abstract string PrintFunctionName { get; }
         protected abstract string MethodPrefix { get; }
 
-        protected virtual string GetBinaryOperator(BinaryOperationOperator op)
+        protected virtual string GetBinaryOperator(BinaryOperator op)
         {
             switch (op)
             {
-                case BinaryOperationOperator.BitAnd: return "&";
-                case BinaryOperationOperator.Minus: return "-";
-                case BinaryOperationOperator.Multiply: return "*";
-                case BinaryOperationOperator.BitOr: return "|";
-                case BinaryOperationOperator.Plus: return "+";
-                case BinaryOperationOperator.Xor: return "^";
+                case BinaryOperator.BitAnd: return "&";
+                case BinaryOperator.Minus: return "-";
+                case BinaryOperator.Multiply: return "*";
+                case BinaryOperator.BitOr: return "|";
+                case BinaryOperator.Plus: return "+";
+                case BinaryOperator.Xor: return "^";
                 default: throw new ArgumentOutOfRangeException(nameof(op));
             }
         }
@@ -630,16 +603,16 @@ namespace CompilerBenchmarker2
         protected virtual string FunctionWrapStart => "{";
         protected virtual string FunctionWrapEnd => "}";
 
-        protected virtual string GetBinaryOperator(BinaryOperationOperator op)
+        protected virtual string GetBinaryOperator(BinaryOperator op)
         {
             switch (op)
             {
-                case BinaryOperationOperator.BitAnd: return "&";
-                case BinaryOperationOperator.Minus: return "-";
-                case BinaryOperationOperator.Multiply: return "*";
-                case BinaryOperationOperator.BitOr: return "|";
-                case BinaryOperationOperator.Plus: return "+";
-                case BinaryOperationOperator.Xor: return "^";
+                case BinaryOperator.BitAnd: return "&";
+                case BinaryOperator.Minus: return "-";
+                case BinaryOperator.Multiply: return "*";
+                case BinaryOperator.BitOr: return "|";
+                case BinaryOperator.Plus: return "+";
+                case BinaryOperator.Xor: return "^";
                 default: throw new ArgumentOutOfRangeException(nameof(op));
             }
         }
@@ -675,10 +648,12 @@ namespace CompilerBenchmarker2
                         ? $"{MutableDeclaration} {vname}: {IntType} = {vexpr}"
                         : $"{ImmutableDeclaration} {vname}: {IntType} = {vexpr}";
                 case Return ret:
-                    return $"{GetExpression(ret.Expr)}";
+                    return GetExpression(ret.Expr);
                 case Print print:
                     var pvname = print.Variable.VariableName;
-                        return $"{PrintFunctionName}{(ML ? " " : "")}({pvname})";
+                    return ML
+                        ? $"{PrintFunctionName} {pvname}"
+                        : $"{PrintFunctionName}({pvname})";
                 default: throw new ArgumentOutOfRangeException(nameof(statement));
             }
         }
@@ -749,16 +724,16 @@ namespace CompilerBenchmarker2
         protected override string ImmutableDeclaration => "val";
         protected override bool ML => false;
 
-        protected override string GetBinaryOperator(BinaryOperationOperator op)
+        protected override string GetBinaryOperator(BinaryOperator op)
         {
             switch (op)
             {
-                case BinaryOperationOperator.BitAnd: return "and";
-                case BinaryOperationOperator.Minus: return "-";
-                case BinaryOperationOperator.Multiply: return "*";
-                case BinaryOperationOperator.BitOr: return "or";
-                case BinaryOperationOperator.Plus: return "+";
-                case BinaryOperationOperator.Xor: return "xor";
+                case BinaryOperator.BitAnd: return "and";
+                case BinaryOperator.Minus: return "-";
+                case BinaryOperator.Multiply: return "*";
+                case BinaryOperator.BitOr: return "or";
+                case BinaryOperator.Plus: return "+";
+                case BinaryOperator.Xor: return "xor";
                 default: throw new ArgumentOutOfRangeException(nameof(op));
             }
         }
@@ -787,9 +762,112 @@ namespace CompilerBenchmarker2
         }
     }
 
-    // todo add:
-    // round 2: scala, kotlin, ocaml,
-    // round 3: fsharp, haskell, rust
+    class OCamlLang : BaseExpressionLang
+    {
+        public override string Extension => "ml";
+        protected override string IntType => "int";
+        protected override string Main => "main ()";
+        protected override string PrintFunctionName => @"Printf.printf ""%i\n""";
+        protected override string MethodPrefix => "let";
+        protected override string AssignmentOperator => "=";
+        // choosing to ignore OCaml ref; ref int is not int
+        protected override string MutableDeclaration => "let";
+        protected override string ImmutableDeclaration => "let";
+        protected override bool ML => true;
+        protected override string FunctionWrapStart => "=";
+        protected override string FunctionWrapEnd => "";
+
+        protected override string GetBinaryOperator(BinaryOperator op)
+        {
+            switch (op)
+            {
+                case BinaryOperator.BitAnd: return "land";
+                case BinaryOperator.Minus: return "-";
+                case BinaryOperator.Multiply: return "*";
+                case BinaryOperator.BitOr: return "lor";
+                case BinaryOperator.Plus: return "+";
+                case BinaryOperator.Xor: return "lxor";
+                default: throw new ArgumentOutOfRangeException(nameof(op));
+            }
+        }
+
+        protected override string GetStatement(IStatement statement, HashSet<Variable> assignedTo)
+        {
+            // handle "let <expr> in"
+            if (statement is Print print)
+                return $"{PrintFunctionName} {GetExpression(print.Variable)};;";
+            else if (statement is Return ret)
+                return GetExpression(ret.Expr);
+            else if (statement is Assignment assignment)
+            {
+                var aname = assignment.Variable.VariableName;
+                var aexpr = GetExpression(assignment.AssignedExpression);
+                return $"let {aname} {AssignmentOperator} {aexpr} in";
+            }
+            else
+                return base.GetStatement(statement, assignedTo) + " in";
+        }
+
+        public override IEnumerable<string> GetProgramLines(Program program)
+        {
+            foreach (var fun in program.Functions)
+            {
+                foreach (var line in GetFunctionDeclarationLines(fun))
+                    yield return line;
+                yield return "";
+            }
+
+            foreach (var line in GetFunctionDeclarationLines(program.Main))
+                yield return line;
+            yield return "";
+            yield return "main ()";
+        }
+    }
+
+    class FSharpLang : BaseExpressionLang
+    {
+        public override string Extension => "fs";
+        protected override string IntType => "int";
+        protected override string Main => "main args";
+        protected override string PrintFunctionName => @"printfn ""%i\n""";
+        protected override string MethodPrefix => "let";
+        protected override string AssignmentOperator => "<-";
+        protected override string MutableDeclaration => "let mutable ";
+        protected override string ImmutableDeclaration => "let";
+        protected override bool ML => true;
+        protected override string FunctionWrapStart => "=";
+        protected override string FunctionWrapEnd => "";
+
+        protected override string GetBinaryOperator(BinaryOperator op)
+        {
+            switch (op)
+            {
+                case BinaryOperator.BitAnd: return "&&&";
+                case BinaryOperator.Minus: return "-";
+                case BinaryOperator.Multiply: return "*";
+                case BinaryOperator.BitOr: return "|||";
+                case BinaryOperator.Plus: return "+";
+                case BinaryOperator.Xor: return "^^^";
+                default: throw new ArgumentOutOfRangeException(nameof(op));
+            }
+        }
+
+        public override IEnumerable<string> GetProgramLines(Program program)
+        {
+            foreach (var fun in program.Functions)
+            {
+                foreach (var line in GetFunctionDeclarationLines(fun))
+                    yield return line;
+                yield return "";
+            }
+
+            yield return "[<EntryPoint>]";
+            foreach (var line in GetFunctionDeclarationLines(program.Main))
+                yield return line;
+            yield return $"{IndentSpaces}0";
+        }
+    }
+    // round 3: haskell, rust
 
     #endregion
 
@@ -804,8 +882,8 @@ namespace CompilerBenchmarker2
                 case "d": return new DLang();
                 case "go": return new GoLang();
                 // case "rust": return new RustLang();
-                // case "ocaml": return new OCamlLang();
-                // case "fsharp": return new FSharpLang();
+                case "ocaml": return new OCamlLang();
+                case "fsharp": return new FSharpLang();
                 case "csharp": return new CSharpLang();
                 // case "haskell": return new HaskellLang();
                 case "kotlin": return new KotlinLang();

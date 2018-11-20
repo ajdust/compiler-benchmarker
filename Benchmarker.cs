@@ -156,7 +156,7 @@ namespace CompilerBenchmarker
             var isDotnet = compiler.Exe == "dotnet";
             if (isDotnet)
             {
-                using (var p = Process.Start(compiler.Exe, "restore"))
+                using (var p = Process.Start(compiler.Exe, $"restore CBT.{compiler.Extension}proj"))
                 {
                     p.WaitForExit();
                     if (p.ExitCode != 0)
@@ -170,9 +170,9 @@ namespace CompilerBenchmarker
             var watch = new Stopwatch();
             watch.Start();
 
-            var args = isDotnet
-                ? compiler.MiscArguments + " " + compiler.OptimizeArguments // project file should find the file
-                : compiler.MiscArguments + " " + compiler.OptimizeArguments + " " + codeFilePath;
+            string args = isDotnet
+                ? $"{compiler.MiscArguments} {compiler.OptimizeArguments} CBT.{compiler.Extension}proj"
+                : $"{compiler.MiscArguments} {compiler.OptimizeArguments} {codeFilePath}";
 
             Console.WriteLine($"  - Running with {numFun}: {compiler.Exe} {args}");
             using (var p = Process.Start(compiler.Exe, args))
@@ -201,10 +201,13 @@ namespace CompilerBenchmarker
             var codeExt = compilers
                 .Select(x => $"\\d.{x.Extension}$")
                 .Distinct();
-            var notCodeExt = $"{codeExt.Join("|")}|.csv$|.txt|.csproj$";
+            var notCodeExt = codeExt.Join("|") + @"|\.csv$|\.txt$|\.csproj$|\.fsproj";
             Action<FileInfo> toDelete = fileInfo => {
                 if (!Regex.IsMatch(fileInfo.FullName, notCodeExt))
+                {
+                    // Console.WriteLine("Deleting " + fileInfo.FullName);
                     File.Delete(fileInfo.FullName);
+                }
             };
 
             var codeGen = new CompilerBenchmarker2.CodeGen2();
@@ -220,15 +223,17 @@ namespace CompilerBenchmarker
                     step <= numberOfSteps;
                     step += 1, numFun += increaseOnStep)
                 {
+                    var codeFilePath = $"test_{langCompilers.First().Extension}_{numFun}.{langCompilers.First().Extension}";
+
                     if (!Directory.Exists(numFun.ToString()))
                     {
                         Directory.CreateDirectory(numFun.ToString());
                         File.Copy("CBT.csproj", $"{numFun}/CBT.csproj"); // todo: only do if dotnet project needed..
+                        File.WriteAllText($"{numFun}/CBT.fsproj", File.ReadAllText("CBT.fsproj").Replace("$CBT_FILE", codeFilePath));
                     }
                     Directory.SetCurrentDirectory(numFun.ToString());
                     Console.Write($"- Generating {langCompilers.Key} with {numFun} functions.. ");
 
-                    var codeFilePath = $"test_{langCompilers.First().Extension}_{numFun}.{langCompilers.First().Extension}";
                     // if (File.Exists(codeFilePath))
                     // {
                     //     Console.Write("Exists already.");
@@ -328,21 +333,21 @@ namespace CompilerBenchmarker
                     // new Compiler("D",         "d",     "ldc2", "--version", "-O"),
                     // new Compiler("D",         "d",     "ldc2", "--version"),
                     // new Compiler("OCaml",    "ml", "ocamlopt", "--version", "-O2"),
-                    // new Compiler("OCaml",    "ml", "ocamlopt", "--version"),
+                    new Compiler("OCaml",    "ml", "ocamlopt", "--version"),
                     // new Compiler("Haskell",  "hs",      "ghc", "--version", "-O"),
                     // new Compiler("Haskell",  "hs",      "ghc", "--version"),
                     // new Compiler("Go",       "go",       "go",   "version", "build"),
                     // VM
-                    // new Compiler("CSharp",   "cs",   "RunCsc", "/version", "/o", miscArguments: "/nowarn:1717"),
-                    // new Compiler("CSharp",   "cs",      "dotnet", "/version",       miscArguments: "build --no-restore"),
-                    // new Compiler("FSharp",   "fs",  "fsharpc",   "--help", "-O", miscArguments: "--nologo"), // fsharpc does not have a version flag?
-                    // new Compiler("FSharp",   "fs",  "fsharpc",   "--help",       miscArguments: "--nologo"), // fsharpc does not have a version flag?
+                    // new Compiler("CSharp",   "cs",   "dotnet", "--version", "-o", miscArguments: "/nowarn:1717"),
+                    // new Compiler("CSharp",   "cs",      "dotnet", "--version",       miscArguments: "build --no-restore"),
+                    // new Compiler("FSharp",   "fs",  "dotnet",   "--version", "-o", miscArguments: "--nologo"),
+                    // new Compiler("FSharp",   "fs",  "dotnet",   "--version",       miscArguments: "build --no-restore"),
                     // new Compiler("Java",   "java",    "javac", "-version",       miscArguments: "-J-Xmx4096M -J-Xms64M"),
                     // new Compiler("Scala", "scala",   "scalac", "-version", "-optimise"), // modified to use Java -Xmx4096M -Xms64M -Xss4m
                     // new Compiler("Scala", "scala",   "scalac", "-version"),              // modified to use Java -Xmx4096M -Xms64M -Xss4m
                     // new Compiler("Scala", "scala",     "dotc", "-version", "-optimise"), // modified to use Java -Xmx4096M -Xss4m
                     // new Compiler("Scala", "scala",     "dotc", "-version"),              // modified to use Java -Xmx4096M -Xss4m
-                    new Compiler("Kotlin",   "kt",  "kotlinc", "-version"),              // modified to use Java -Xmx4096M -Xms64M -Xss4m
+                    // new Compiler("Kotlin",   "kt",  "kotlinc", "-version"),              // modified to use Java -Xmx4096M -Xms64M -Xss4m
                 };
 
                 foreach (var c in compilers.GroupBy(x => x.Exe).Select(x => x.First()))
