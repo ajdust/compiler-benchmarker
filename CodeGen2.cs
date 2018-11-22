@@ -138,13 +138,14 @@ namespace CompilerBenchmarker2
 
         public static BinaryOperator Operator(this Random random)
         {
-            switch (random.Next(1, 6))
+            switch (random.Next(1, 7))
             {
                 case 1: return BinaryOperator.BitAnd;
                 case 2: return BinaryOperator.Minus;
                 case 3: return BinaryOperator.Multiply;
                 case 4: return BinaryOperator.BitOr;
                 case 5: return BinaryOperator.Plus;
+                case 6: return BinaryOperator.Xor;
                 default: return BinaryOperator.Xor;
             }
         }
@@ -664,10 +665,10 @@ namespace CompilerBenchmarker2
                 fun.Statements.OfType<Assignment>().Select(a => a.Variable));
 
             var isMain = fun is MainFunctionDeclaration;
-            if (isMain)
-                yield return $"{MethodPrefix} {Main} {FunctionWrapStart}";
-            else
-                yield return $"{MethodPrefix} {fun.FunctionName}(): {IntType} {FunctionWrapStart}";
+            yield return isMain
+                ? $"{MethodPrefix} {Main} {FunctionWrapStart}"
+                : $"{MethodPrefix} {fun.FunctionName}(): {IntType} {FunctionWrapStart}";
+
             foreach (var statement in fun.Statements)
             {
                 if (isMain && statement is Return)
@@ -867,8 +868,102 @@ namespace CompilerBenchmarker2
             yield return $"{IndentSpaces}0";
         }
     }
-    // round 3: haskell, rust
 
+    class HaskellLang : BaseExpressionLang
+    {
+        public override string Extension => "hs";
+        protected override string IntType => "Int32";
+        protected override string Main => "main :: IO ()\nmain ";
+        protected override string PrintFunctionName => @"printf ""%i\n""";
+        protected override string MethodPrefix => "";
+        protected override string AssignmentOperator => "=";
+        protected override string MutableDeclaration => "let";
+        protected override string ImmutableDeclaration => "let";
+        protected override bool ML => true;
+        protected override string FunctionWrapStart => "=";
+        protected override string FunctionWrapEnd => "";
+
+        protected override string GetBinaryOperator(BinaryOperator op)
+        {
+            switch (op)
+            {
+                case BinaryOperator.BitAnd: return "&&&";
+                case BinaryOperator.Minus: return "-";
+                case BinaryOperator.Multiply: return "*";
+                case BinaryOperator.BitOr: return "|||";
+                case BinaryOperator.Plus: return "+";
+                case BinaryOperator.Xor: return "^^^";
+                default: throw new ArgumentOutOfRangeException(nameof(op));
+            }
+        }
+
+        protected override string GetStatement(IStatement statement, HashSet<Variable> assignedTo)
+        {
+            switch (statement)
+            {
+                case Assignment assignment:
+                    var aname = assignment.Variable.VariableName;
+                    var aexpr = GetExpression(assignment.AssignedExpression);
+                    return $"let {aname} {AssignmentOperator} {aexpr} in";
+                case VariableDeclaration variableDeclaration:
+                    var vname = variableDeclaration.Variable.VariableName;
+                    var vexpr = GetExpression(variableDeclaration.Initializer);
+                    return $"{ImmutableDeclaration} ({vname} :: {IntType}) {AssignmentOperator} {vexpr} in";
+                case Return ret:
+                    return GetExpression(ret.Expr);
+                case Print print:
+                    return $"{PrintFunctionName} {print.Variable.VariableName}";
+                default: throw new ArgumentOutOfRangeException(nameof(statement));
+            }
+        }
+
+        protected override IEnumerable<string> GetFunctionDeclarationLines(FunctionDeclaration fun)
+        {
+            var assignedTo = new HashSet<Variable>(
+                fun.Statements.OfType<Assignment>().Select(a => a.Variable));
+
+            var isMain = fun is MainFunctionDeclaration;
+            yield return isMain
+                ? $"{Main} {FunctionWrapStart}"
+                : $"{fun.FunctionName} :: () -> {IntType}\n{fun.FunctionName} () {FunctionWrapStart}";
+
+            foreach (var statement in fun.Statements)
+            {
+                if (isMain && statement is Return)
+                    continue;
+
+                yield return $"{IndentSpaces}{GetStatement(statement, assignedTo)}";
+            }
+            yield return FunctionWrapEnd;
+        }
+
+        public override IEnumerable<string> GetProgramLines(Program program)
+        {
+            yield return "{-# LANGUAGE ScopedTypeVariables #-}";
+            yield return "import GHC.Int (Int32)";
+            yield return "import Data.Bits ((.&.), (.|.), xor)";
+            yield return "import Text.Printf (printf)";
+            yield return "";
+            // avoid 'cannot construct the infinite type' error
+            yield return "(&&&) :: Int32 -> Int32 -> Int32";
+            yield return "a &&& b = a .&. b";
+            yield return "(|||) :: Int32 -> Int32 -> Int32";
+            yield return "a ||| b = a .|. b";
+            yield return "(^^^) :: Int32 -> Int32 -> Int32";
+            yield return "a ^^^ b = a `xor` b";
+            yield return "";
+
+            foreach (var fun in program.Functions)
+            {
+                foreach (var line in GetFunctionDeclarationLines(fun))
+                    yield return line;
+                yield return "";
+            }
+
+            foreach (var line in GetFunctionDeclarationLines(program.Main))
+                yield return line;
+        }
+    }
     #endregion
 
     public class CodeGen2
@@ -885,7 +980,7 @@ namespace CompilerBenchmarker2
                 case "ocaml": return new OCamlLang();
                 case "fsharp": return new FSharpLang();
                 case "csharp": return new CSharpLang();
-                // case "haskell": return new HaskellLang();
+                case "haskell": return new HaskellLang();
                 case "kotlin": return new KotlinLang();
                 case "java": return new JavaLang();
                 case "scala": return new ScalaLang();

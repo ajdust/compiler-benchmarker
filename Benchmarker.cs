@@ -333,9 +333,9 @@ namespace CompilerBenchmarker
                     // new Compiler("D",         "d",     "ldc2", "--version", "-O"),
                     // new Compiler("D",         "d",     "ldc2", "--version"),
                     // new Compiler("OCaml",    "ml", "ocamlopt", "--version", "-O2"),
-                    new Compiler("OCaml",    "ml", "ocamlopt", "--version"),
+                    // new Compiler("OCaml",    "ml", "ocamlopt", "--version"),
                     // new Compiler("Haskell",  "hs",      "ghc", "--version", "-O"),
-                    // new Compiler("Haskell",  "hs",      "ghc", "--version"),
+                    new Compiler("Haskell",  "hs",      "stack", "--version", miscArguments: "ghc"),
                     // new Compiler("Go",       "go",       "go",   "version", "build"),
                     // VM
                     // new Compiler("CSharp",   "cs",   "dotnet", "--version", "-o", miscArguments: "/nowarn:1717"),
