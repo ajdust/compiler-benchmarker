@@ -231,6 +231,7 @@ namespace CompilerBenchmarker2
         {
             IExpr expr = random.Expression(declaredVariables, declaredFunctions);
 
+            // the main print prevents unused variable warnings
             foreach (var v in declaredVariables)
                 expr = new BinaryOperation(expr, random.Operator(), v);
 
@@ -257,7 +258,7 @@ namespace CompilerBenchmarker2
         {
             IExpr expr = random.Expression(declaredVariables, declaredFunctions);
 
-            // Use all variables to avoid unused variable warnings
+            // function return prevents unused variable warnings
             foreach (var v in declaredVariables)
                 expr = new BinaryOperation(expr, random.Operator(), v);
 
@@ -278,7 +279,15 @@ namespace CompilerBenchmarker2
                 decVars.Add(new Variable(Constants.P));
 
             // Variable declaration to start off every function
-            var firstDecVar = random.VariableDeclaration(decVars, decFuns);
+            // If possible, used the last function declaration to ensure all are used
+            var firstDecVar = decFuns.Any()
+                ? new VariableDeclaration(
+                    new Variable($"x{decVars.Count}"),
+                    new FunctionCall(
+                        decFuns.Last().FunctionName,
+                        new Literal(random.Next(0, 100))))
+                : random.VariableDeclaration(decVars, decFuns);
+
             statements.Add(firstDecVar);
             decVars.Add(firstDecVar.Variable);
 
@@ -300,7 +309,6 @@ namespace CompilerBenchmarker2
 
             if (isMain)
             {
-                // the main declaration prevents unused variable warnings in main
                 var m = random.MainVariableDeclaration(decVars, decFuns);
                 statements.Add(m);
                 statements.Add(new Print(m.Variable));
@@ -1008,6 +1016,67 @@ namespace CompilerBenchmarker2
                 yield return line;
         }
     }
+
+    class RustLang : BaseExpressionLang
+    {
+        public override string Extension => "rs";
+        protected override string IntType => "i32";
+        protected override string Main => "main()";
+        protected override string PrintFunctionName => @"println!(""{}"", ";
+        protected override string MethodPrefix => "fn";
+        protected override string AssignmentOperator => "=";
+        protected override string MutableDeclaration => "let mut";
+        protected override string ImmutableDeclaration => "let";
+        protected override bool ML => false;
+
+        protected override string GetStatement(
+            IStatement statement, HashSet<Variable> assignedTo)
+        {
+            if (statement is Print print)
+                return $"{PrintFunctionName} {print.Variable.VariableName});";
+            else if (statement is Return ret)
+                return GetExpression(ret.Expr);
+            else
+                return base.GetStatement(statement, assignedTo) + ";";
+        }
+
+        protected override IEnumerable<string> GetFunctionDeclarationLines(FunctionDeclaration fun)
+        {
+            var assignedTo = new HashSet<Variable>(
+                fun.Statements.OfType<Assignment>().Select(a => a.Variable));
+
+            var isMain = fun is MainFunctionDeclaration;
+            yield return isMain
+                ? $"{MethodPrefix} {Main} {FunctionWrapStart}"
+                : $"{MethodPrefix} {fun.FunctionName}({Constants.P}: {IntType}) -> {IntType} {FunctionWrapStart}";
+
+            foreach (var statement in fun.Statements)
+            {
+                if (isMain && statement is Return)
+                    continue;
+
+                yield return $"{IndentSpaces}{GetStatement(statement, assignedTo)}";
+            }
+            yield return FunctionWrapEnd;
+        }
+
+        public override IEnumerable<string> GetProgramLines(Program program)
+        {
+            yield return "#![allow(unused_parens)]\n";
+
+            foreach (var fun in program.Functions)
+            {
+                foreach (var line in GetFunctionDeclarationLines(fun))
+                    yield return line;
+                yield return "";
+            }
+
+            foreach (var line in GetFunctionDeclarationLines(program.Main))
+                yield return line;
+        }
+    }
+
+
     #endregion
 
     public class CodeGen2
@@ -1020,7 +1089,7 @@ namespace CompilerBenchmarker2
                 case "c": return new CLang();
                 case "d": return new DLang();
                 case "go": return new GoLang();
-                // case "rust": return new RustLang();
+                case "rust": return new RustLang();
                 case "ocaml": return new OCamlLang();
                 case "fsharp": return new FSharpLang();
                 case "csharp": return new CSharpLang();

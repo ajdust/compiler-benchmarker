@@ -332,7 +332,7 @@ namespace CompilerBenchmarker
                     // new Compiler("C++",     "cpp",    "clang++", "--version", "-O2"),
                     // new Compiler("C++",     "cpp",    "clang++", "--version"),
                     // new Compiler("Rust",     "rs",    "rustc", "--version", "-C opt-level=2"),
-                    // new Compiler("Rust",     "rs",    "rustc", "--version"),
+                    new Compiler("Rust",     "rs",    "rustc", "--version"),
                     // new Compiler("D",         "d",      "dmd", "--version", "-O"),
                     // new Compiler("D",         "d",      "dmd", "--version"),
                     // new Compiler("D",         "d",      "gdc", "--version", "-O"),
@@ -348,13 +348,13 @@ namespace CompilerBenchmarker
                     // new Compiler("CSharp",   "cs",   "dotnet", "--version", "-o", miscArguments: "/nowarn:1717"),
                     // new Compiler("CSharp",   "cs",      "dotnet", "--version",       miscArguments: "build --no-restore"),
                     // new Compiler("FSharp",   "fs",  "dotnet",   "--version", "-o", miscArguments: "--nologo"),
-                    new Compiler("FSharp",   "fs",  "dotnet",   "--version",       miscArguments: "build --no-restore"),
+                    // new Compiler("FSharp",   "fs",  "dotnet",   "--version",       miscArguments: "build --no-restore"),
                     // new Compiler("Java",   "java",    "javac", "-version",       miscArguments: "-J-Xmx4096M -J-Xms64M"),
                     // new Compiler("Scala", "scala",   "scalac", "-version", "-optimise"), // modified to use Java -Xmx4096M -Xms64M -Xss4m
-                    new Compiler("Scala", "scala",   "scalac", "-version"),              // modified to use Java -Xmx4096M -Xms64M -Xss4m
+                    // new Compiler("Scala", "scala",   "scalac", "-version"),              // modified to use Java -Xmx4096M -Xms64M -Xss4m
                     // new Compiler("Scala", "scala",     "dotc", "-version", "-optimise"), // modified to use Java -Xmx4096M -Xss4m
                     // new Compiler("Scala", "scala",     "dotc", "-version"),              // modified to use Java -Xmx4096M -Xss4m
-                    new Compiler("Kotlin",   "kt",  "kotlinc", "-version"),              // modified to use Java -Xmx4096M -Xms64M -Xss4m
+                    // new Compiler("Kotlin",   "kt",  "kotlinc", "-version"),              // modified to use Java -Xmx4096M -Xms64M -Xss4m
                 };
 
                 foreach (var c in compilers.GroupBy(x => x.Exe).Select(x => x.First()))
