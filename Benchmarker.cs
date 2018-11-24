@@ -226,9 +226,16 @@ namespace CompilerBenchmarker
                     var codeFilePath = $"test_{langCompilers.First().Extension}_{numFun}.{langCompilers.First().Extension}";
 
                     if (!Directory.Exists(numFun.ToString()))
-                    {
                         Directory.CreateDirectory(numFun.ToString());
-                        File.Copy("CBT.csproj", $"{numFun}/CBT.csproj"); // todo: only do if dotnet project needed..
+
+                    if (langCompilers.Any(c => c.Exe == "dotnet"))
+                    {
+                        if (File.Exists($"{numFun}/CBT.csproj"))
+                            File.Delete($"{numFun}/CBT.csproj");
+                        File.Copy("CBT.csproj", $"{numFun}/CBT.csproj");
+
+                        if (File.Exists($"{numFun}/CBT.fsproj"))
+                            File.Delete($"{numFun}/CBT.fsproj");
                         File.WriteAllText($"{numFun}/CBT.fsproj", File.ReadAllText("CBT.fsproj").Replace("$CBT_FILE", codeFilePath));
                     }
                     Directory.SetCurrentDirectory(numFun.ToString());
@@ -304,7 +311,7 @@ namespace CompilerBenchmarker
 
         static void Main(string[] args)
         {
-            int numberAtStart = 10;
+            int numberAtStart = 5;
             int numberOfSteps = 1;
             int stepIncreaseNumber = 0;
             // int numberAtStart = 5000;
@@ -335,19 +342,19 @@ namespace CompilerBenchmarker
                     // new Compiler("OCaml",    "ml", "ocamlopt", "--version", "-O2"),
                     // new Compiler("OCaml",    "ml", "ocamlopt", "--version"),
                     // new Compiler("Haskell",  "hs",      "ghc", "--version", "-O"),
-                    new Compiler("Haskell",  "hs",      "stack", "--version", miscArguments: "ghc"),
+                    // new Compiler("Haskell",  "hs",      "stack", "--version", miscArguments: "ghc"),
                     // new Compiler("Go",       "go",       "go",   "version", "build"),
                     // VM
                     // new Compiler("CSharp",   "cs",   "dotnet", "--version", "-o", miscArguments: "/nowarn:1717"),
                     // new Compiler("CSharp",   "cs",      "dotnet", "--version",       miscArguments: "build --no-restore"),
                     // new Compiler("FSharp",   "fs",  "dotnet",   "--version", "-o", miscArguments: "--nologo"),
-                    // new Compiler("FSharp",   "fs",  "dotnet",   "--version",       miscArguments: "build --no-restore"),
+                    new Compiler("FSharp",   "fs",  "dotnet",   "--version",       miscArguments: "build --no-restore"),
                     // new Compiler("Java",   "java",    "javac", "-version",       miscArguments: "-J-Xmx4096M -J-Xms64M"),
                     // new Compiler("Scala", "scala",   "scalac", "-version", "-optimise"), // modified to use Java -Xmx4096M -Xms64M -Xss4m
-                    // new Compiler("Scala", "scala",   "scalac", "-version"),              // modified to use Java -Xmx4096M -Xms64M -Xss4m
+                    new Compiler("Scala", "scala",   "scalac", "-version"),              // modified to use Java -Xmx4096M -Xms64M -Xss4m
                     // new Compiler("Scala", "scala",     "dotc", "-version", "-optimise"), // modified to use Java -Xmx4096M -Xss4m
                     // new Compiler("Scala", "scala",     "dotc", "-version"),              // modified to use Java -Xmx4096M -Xss4m
-                    // new Compiler("Kotlin",   "kt",  "kotlinc", "-version"),              // modified to use Java -Xmx4096M -Xms64M -Xss4m
+                    new Compiler("Kotlin",   "kt",  "kotlinc", "-version"),              // modified to use Java -Xmx4096M -Xms64M -Xss4m
                 };
 
                 foreach (var c in compilers.GroupBy(x => x.Exe).Select(x => x.First()))

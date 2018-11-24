@@ -29,11 +29,16 @@ namespace CompilerBenchmarker2
             obj is Variable v && v.VariableName == VariableName;
     }
 
-    // e.g. 'myFunction()'
+    // e.g. 'myFunction(x0)'
     class FunctionCall : IExpr
     {
         public string FunctionName { get; }
-        public FunctionCall(string name) => FunctionName = name;
+        public IExpr Argument { get; }
+        public FunctionCall(string name, IExpr argument)
+        {
+            FunctionName = name;
+            Argument = argument;
+        }
     }
 
     // e.g. '<expr> * <expr>'
@@ -92,8 +97,15 @@ namespace CompilerBenchmarker2
 
     interface IFunctionDeclaration {}
 
+    static class Constants
+    {
+        public const string P = "p";
+    }
+
+    // e.g. 'int f0(int x0) { ... }'
     class FunctionDeclaration : IFunctionDeclaration
     {
+        public const string Parameter = "p";
         public string FunctionName { get; }
         public IList<IStatement> Statements { get; }
         public FunctionDeclaration(string functionName, IList<IStatement> statements)
@@ -107,6 +119,7 @@ namespace CompilerBenchmarker2
             obj is FunctionDeclaration f && f.FunctionName == FunctionName;
     }
 
+    // e.g. 'int main(void) { ... }'
     class MainFunctionDeclaration : FunctionDeclaration
     {
         public MainFunctionDeclaration(string functionName, IList<IStatement> statements)
@@ -158,17 +171,26 @@ namespace CompilerBenchmarker2
             switch (random.Next(1, 5))
             {
                 case 1:
-                    return new Literal(random.Next(0, 1000));
+                    return new Literal(random.Next(0, 100));
                 case 2:
-                    if (declaredVariables.Any())
-                        return random.From(declaredVariables);
-                    else
-                        return new Literal(random.Next(0, 1000));
+                    return declaredVariables.Any()
+                        ? random.From(declaredVariables)
+                        : (IExpr)new Literal(random.Next(0, 100));
                 case 3:
                     if (declaredFunctions.Any())
-                        return new FunctionCall(random.From(declaredFunctions).FunctionName);
+                    {
+                        return declaredVariables.Any()
+                            ? new FunctionCall(
+                                random.From(declaredFunctions).FunctionName,
+                                random.From(declaredVariables))
+                            : new FunctionCall(
+                                random.From(declaredFunctions).FunctionName,
+                                new Literal(random.Next(0, 100)));
+                    }
                     else
-                        return new Literal(random.Next(0, 1000));
+                    {
+                        return new Literal(random.Next(0, 100));
+                    }
                 default: return new BinaryOperation(
                     random.Expression(declaredVariables, declaredFunctions),
                     random.Operator(),
@@ -182,6 +204,13 @@ namespace CompilerBenchmarker2
             IReadOnlyCollection<FunctionDeclaration> declaredFunctions)
         {
             var to = random.From(declaredVariables);
+
+            // prevent assigning to function parameter
+            while (to.VariableName == Constants.P)
+            {
+                to = random.From(declaredVariables);
+            }
+
             var expr = random.Expression(declaredVariables, declaredFunctions);
 
             // prevent variable self-assignments e.g. 'x0 = x0'
@@ -243,6 +272,10 @@ namespace CompilerBenchmarker2
             var numStatements = random.Next(1, maxStatementsPerFunction);
             var statements = new List<IStatement>();
             var decVars = new List<Variable>();
+
+            // Add variable for argument
+            if (!isMain)
+                decVars.Add(new Variable(Constants.P));
 
             // Variable declaration to start off every function
             var firstDecVar = random.VariableDeclaration(decVars, decFuns);
@@ -315,8 +348,6 @@ namespace CompilerBenchmarker2
         public abstract string Extension { get; }
         protected virtual string EndStatement => ";";
         protected virtual string IntType => "int";
-
-        // Rust, Kotlin, Scala, Swift, F# don't need "return"
         protected abstract string Main { get; }
         protected abstract string PrintFunctionName { get; }
         protected abstract string MethodPrefix { get; }
@@ -342,7 +373,7 @@ namespace CompilerBenchmarker2
                 case Literal literal: return literal.Text;
                 case Variable variable: return variable.VariableName;
                 case FunctionCall functionCall:
-                    return $"{functionCall.FunctionName}()";
+                    return $"{functionCall.FunctionName}({GetExpression(functionCall.Argument)})";
                 case BinaryOperation binOp:
                     var left = GetExpression(binOp.LeftOperand);
                     var right = GetExpression(binOp.RightOperand);
@@ -374,12 +405,13 @@ namespace CompilerBenchmarker2
 
         protected virtual IEnumerable<string> GetFunctionDeclarationLines(FunctionDeclaration fun)
         {
-            if (fun is MainFunctionDeclaration main)
-                yield return $"{MethodPrefix}{IntType} {Main} {{";
-            else
-                yield return $"{MethodPrefix}{IntType} {fun.FunctionName}() {{";
+            yield return (fun is MainFunctionDeclaration)
+                ? $"{MethodPrefix}{IntType} {Main} {{"
+                : $"{MethodPrefix}{IntType} {fun.FunctionName}({IntType} {Constants.P}) {{";
+
             foreach (var statement in fun.Statements)
                 yield return $"    {GetStatement(statement)}";
+
             yield return "}";
         }
 
@@ -452,17 +484,28 @@ namespace CompilerBenchmarker2
     {
         public override string Extension => "c";
 
-        protected override string PrintFunctionName => "CUSTOM_PRINT";
+        protected override string PrintFunctionName => @"printf(""%i"", ";
 
         protected override string Main => "main(void)";
 
         protected override string MethodPrefix => "";
 
+        protected override string GetStatement(IStatement statement)
+        {
+            if (statement is Print print)
+            {
+                var pvname = print.Variable.VariableName;
+                return $"{PrintFunctionName} {pvname}){EndStatement}";
+            }
+            else
+            {
+                return base.GetStatement(statement);
+            }
+        }
+
         public override IEnumerable<string> GetProgramLines(Program program)
         {
             yield return "#include <stdio.h>";
-            yield return "";
-            yield return @"#define CUSTOM_PRINT(m) printf(""%i"",m)";
             yield return "";
             foreach (var fun in program.Functions)
             {
@@ -540,22 +583,6 @@ namespace CompilerBenchmarker2
 
         protected override string EndStatement => "";
 
-        public override IEnumerable<string> GetProgramLines(Program program)
-        {
-            yield return @"package main";
-            yield return @"import(""fmt"")";
-            yield return "";
-            foreach (var fun in program.Functions)
-            {
-                foreach (var line in GetFunctionDeclarationLines(fun))
-                    yield return line;
-                yield return "";
-            }
-
-            foreach (var line in GetFunctionDeclarationLines(program.Main))
-                yield return line;
-        }
-
         protected override string GetStatement(IStatement statement)
         {
             if (statement is VariableDeclaration variableDeclaration)
@@ -581,11 +608,27 @@ namespace CompilerBenchmarker2
             }
             else
             {
-                yield return $"{MethodPrefix}{fun.FunctionName}() {IntType} {{";
+                yield return $"{MethodPrefix}{fun.FunctionName}({Constants.P} {IntType}) {IntType} {{";
                 foreach (var statement in fun.Statements)
                     yield return $"    {GetStatement(statement)}";
                 yield return "}";
             }
+        }
+
+        public override IEnumerable<string> GetProgramLines(Program program)
+        {
+            yield return @"package main";
+            yield return @"import(""fmt"")";
+            yield return "";
+            foreach (var fun in program.Functions)
+            {
+                foreach (var line in GetFunctionDeclarationLines(fun))
+                    yield return line;
+                yield return "";
+            }
+
+            foreach (var line in GetFunctionDeclarationLines(program.Main))
+                yield return line;
         }
     }
 
@@ -625,7 +668,7 @@ namespace CompilerBenchmarker2
                 case Literal literal: return literal.Text;
                 case Variable variable: return variable.VariableName;
                 case FunctionCall functionCall:
-                    return $"{functionCall.FunctionName}{(ML ? " " : "")}()";
+                    return $"{functionCall.FunctionName}{(ML ? " " : "")}({GetExpression(functionCall.Argument)})";
                 case BinaryOperation binOp:
                     var left = GetExpression(binOp.LeftOperand);
                     var right = GetExpression(binOp.RightOperand);
@@ -667,7 +710,7 @@ namespace CompilerBenchmarker2
             var isMain = fun is MainFunctionDeclaration;
             yield return isMain
                 ? $"{MethodPrefix} {Main} {FunctionWrapStart}"
-                : $"{MethodPrefix} {fun.FunctionName}(): {IntType} {FunctionWrapStart}";
+                : $"{MethodPrefix} {fun.FunctionName}({Constants.P}: {IntType}): {IntType} {FunctionWrapStart}";
 
             foreach (var statement in fun.Statements)
             {
@@ -771,7 +814,7 @@ namespace CompilerBenchmarker2
         protected override string PrintFunctionName => @"Printf.printf ""%i\n""";
         protected override string MethodPrefix => "let";
         protected override string AssignmentOperator => "=";
-        // choosing to ignore OCaml ref; ref int is not int
+        // choosing to ignore OCaml mutable ref for simplicity
         protected override string MutableDeclaration => "let";
         protected override string ImmutableDeclaration => "let";
         protected override bool ML => true;
@@ -877,6 +920,7 @@ namespace CompilerBenchmarker2
         protected override string PrintFunctionName => @"printf ""%i\n""";
         protected override string MethodPrefix => "";
         protected override string AssignmentOperator => "=";
+        // choose to ignore Haskell's Data.IORef for simplicity
         protected override string MutableDeclaration => "let";
         protected override string ImmutableDeclaration => "let";
         protected override bool ML => true;
@@ -925,7 +969,7 @@ namespace CompilerBenchmarker2
             var isMain = fun is MainFunctionDeclaration;
             yield return isMain
                 ? $"{Main} {FunctionWrapStart}"
-                : $"{fun.FunctionName} :: () -> {IntType}\n{fun.FunctionName} () {FunctionWrapStart}";
+                : $"{fun.FunctionName} :: {IntType} -> {IntType}\n{fun.FunctionName} {Constants.P} {FunctionWrapStart}";
 
             foreach (var statement in fun.Statements)
             {
@@ -944,7 +988,7 @@ namespace CompilerBenchmarker2
             yield return "import Data.Bits ((.&.), (.|.), xor)";
             yield return "import Text.Printf (printf)";
             yield return "";
-            // avoid 'cannot construct the infinite type' error
+            // avoid 'cannot construct the infinite type' error by specifying
             yield return "(&&&) :: Int32 -> Int32 -> Int32";
             yield return "a &&& b = a .&. b";
             yield return "(|||) :: Int32 -> Int32 -> Int32";
