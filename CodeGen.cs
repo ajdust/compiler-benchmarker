@@ -3,7 +3,7 @@ using System.Linq;
 using System.Collections.Generic;
 using System.IO;
 
-namespace CompilerBenchmarker2
+namespace CompilerBenchmarker
 {
     #region Data
 
@@ -329,9 +329,8 @@ namespace CompilerBenchmarker2
             (MainFunctionDeclaration)FunctionDeclaration(
                 random, decFuns, maxStatementsPerFunction, true);
 
-        public static Program RandomProgram(int functionCount, int maxStatementsPerFunction)
+        public static Program RandomProgram(Random random, int functionCount, int maxStatementsPerFunction)
         {
-            var random = new Random();
             var functions = new List<FunctionDeclaration>();
             for (var _ = 0; _ < functionCount; _ += 1)
                 functions.Add(random.FunctionDeclaration(functions, maxStatementsPerFunction));
@@ -429,11 +428,8 @@ namespace CompilerBenchmarker2
     class CSharpLang : BaseImperativeLang
     {
         public override string Extension => "cs";
-
         protected override string PrintFunctionName => "Console.WriteLine";
-
         protected override string Main => "Main()";
-
         protected override string MethodPrefix => "static ";
 
         public override IEnumerable<string> GetProgramLines(Program program)
@@ -462,11 +458,8 @@ namespace CompilerBenchmarker2
     class JavaLang : BaseImperativeLang
     {
         public override string Extension => "java";
-
         protected override string PrintFunctionName => "System.out.println";
-
         protected override string Main => "Main()";
-
         protected override string MethodPrefix => "static ";
 
         public override IEnumerable<string> GetProgramLines(Program program)
@@ -491,11 +484,8 @@ namespace CompilerBenchmarker2
     class CLang : BaseImperativeLang
     {
         public override string Extension => "c";
-
         protected override string PrintFunctionName => @"printf(""%i"", ";
-
         protected override string Main => "main(void)";
-
         protected override string MethodPrefix => "";
 
         protected override string GetStatement(IStatement statement)
@@ -530,11 +520,8 @@ namespace CompilerBenchmarker2
     class CppLang : BaseImperativeLang
     {
         public override string Extension => "cpp";
-
         protected override string PrintFunctionName => "std::cout << ";
-
         protected override string Main => "main()";
-
         protected override string MethodPrefix => "";
 
         public override IEnumerable<string> GetProgramLines(Program program)
@@ -556,11 +543,8 @@ namespace CompilerBenchmarker2
     class DLang : BaseImperativeLang
     {
         public override string Extension => "d";
-
         protected override string PrintFunctionName => "writeln";
-
         protected override string Main => "main()";
-
         protected override string MethodPrefix => "";
 
         public override IEnumerable<string> GetProgramLines(Program program)
@@ -582,13 +566,9 @@ namespace CompilerBenchmarker2
     class GoLang : BaseImperativeLang
     {
         public override string Extension => "go";
-
         protected override string PrintFunctionName => "fmt.Println";
-
         protected override string Main => "main()";
-
         protected override string MethodPrefix => "func ";
-
         protected override string EndStatement => "";
 
         protected override string GetStatement(IStatement statement)
@@ -1076,11 +1056,13 @@ namespace CompilerBenchmarker2
         }
     }
 
-
     #endregion
 
-    public class CodeGen2
+    public class CodeGen
     {
+        // Deterministic program creation (the same program written for call to WriteLang)
+        int _seed => Convert.ToInt32(new Random().NextDouble() * 100000);
+
         ILang GetLang(string lang)
         {
             switch (lang.ToLower())
@@ -1109,7 +1091,7 @@ namespace CompilerBenchmarker2
             if (File.Exists(filename))
                 File.Delete(filename);
 
-            var program = ProgramGenerator.RandomProgram(numFuns, 10);
+            var program = ProgramGenerator.RandomProgram(new Random(_seed), numFuns, 10);
             using (var f = new StreamWriter(filename))
             {
                 foreach (var line in lang.GetProgramLines(program))

@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -16,7 +17,7 @@ namespace CompilerBenchmarker
             string.Join(delimiter, s);
     }
 
-    class CompilerComparer : IComparer<Compiler>, IEqualityComparer<Compiler>
+    class CompilerCliComparer : IComparer<Compiler>, IEqualityComparer<Compiler>
     {
         public int Compare(Compiler left, Compiler right)
         {
@@ -37,8 +38,10 @@ namespace CompilerBenchmarker
 
         public int GetHashCode(Compiler c)
         {
-            var h = 4021 ^ c.Language.GetHashCode() ^ c.Exe.GetHashCode() ^ c.VersionTrimmed.GetHashCode();
-            return c.OptimizeArguments == null ? h :h ^ c.OptimizeArguments.GetHashCode();
+            var h = 4021 ^ c.Language.GetHashCode()
+                         ^ c.Exe.GetHashCode()
+                         ^ c.VersionTrimmed.GetHashCode();
+            return c.OptimizeArguments == null ? h : h ^ c.OptimizeArguments.GetHashCode();
         }
     }
 
@@ -56,12 +59,14 @@ namespace CompilerBenchmarker
         public string MiscArguments;
         public string Version;
         public string VersionTrimmed;
+        public StringDictionary EnvironmentVariables;
 
         public Compiler(
             string language, string extension, string exe,
             string versionArgument,
             string optimizeArguments = null,
-            string miscArguments = null)
+            string miscArguments = null,
+            StringDictionary envVars = null)
         {
             if (string.IsNullOrWhiteSpace(language))
                 throw new ArgumentNullException(nameof(language));
@@ -70,7 +75,8 @@ namespace CompilerBenchmarker
             if (string.IsNullOrWhiteSpace(exe))
                 throw new ArgumentNullException(nameof(exe));
             if (string.IsNullOrWhiteSpace(versionArgument))
-                throw new ArgumentNullException(nameof(versionArgument), "Missing option to determine compiler version");
+                throw new ArgumentNullException(nameof(versionArgument),
+                    "Missing option to determine compiler version");
 
             Language = language;
             Extension = extension;
@@ -78,6 +84,7 @@ namespace CompilerBenchmarker
             VersionArgument = versionArgument;
             OptimizeArguments = optimizeArguments;
             MiscArguments = miscArguments;
+            EnvironmentVariables = envVars ?? new StringDictionary();
             CheckCompilerAndSetVersion();
         }
 
@@ -106,7 +113,9 @@ namespace CompilerBenchmarker
                 if (o == null)
                     return;
 
-                var line = o.Split('\n').Where(x => !string.IsNullOrWhiteSpace(x)).FirstOrDefault()?.Trim();
+                var line = o.Split('\n')
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .FirstOrDefault()?.Trim();
                 if (line == null)
                     return;
 
@@ -127,20 +136,25 @@ namespace CompilerBenchmarker
         public string SecondsToCompile =>
             Compiled ? TimeToCompile.TotalSeconds.ToString() : "";
 
-        public static CompilerBenchmark Success(Compiler compiler, TimeSpan timeToCompile, int numberFunctions)
+        public static CompilerBenchmark Success(
+            Compiler compiler, TimeSpan timeToCompile, int numberFunctions)
         {
             if (timeToCompile == TimeSpan.Zero)
-                throw new ArgumentException("Compiling cannot take zero seconds", nameof(timeToCompile));
+                throw new ArgumentException(
+                    "Compiling cannot take zero seconds",
+                    nameof(timeToCompile));
             return new CompilerBenchmark(compiler, timeToCompile, numberFunctions, true);
         }
 
         public static CompilerBenchmark Failure(Compiler compiler, int numberFunctions)
             => new CompilerBenchmark(compiler, TimeSpan.Zero, numberFunctions, false);
 
-        private CompilerBenchmark(Compiler compiler, TimeSpan timeToCompile, int numberFunctions, bool compiled)
+        private CompilerBenchmark(
+            Compiler compiler, TimeSpan timeToCompile, int numberFunctions, bool compiled)
         {
             if (numberFunctions < 0)
-                throw new ArgumentException("Cannot compile zero functions", nameof(numberFunctions));
+                throw new ArgumentException(
+                    "Cannot compile zero functions", nameof(numberFunctions));
 
             Compiler = compiler;
             TimeToCompile = timeToCompile;
@@ -168,28 +182,32 @@ namespace CompilerBenchmarker
             }
 
             var watch = new Stopwatch();
-            watch.Start();
 
+            var optArgs = compiler.OptimizeArguments;
             string args = isDotnet
-                ? $"{compiler.MiscArguments} {compiler.OptimizeArguments} CBT.{compiler.Extension}proj"
-                : $"{compiler.MiscArguments} {compiler.OptimizeArguments} {codeFilePath}";
+                ? $"{compiler.MiscArguments} {optArgs} CB.{compiler.Extension}proj"
+                : $"{compiler.MiscArguments} {optArgs} {codeFilePath}";
 
             Console.WriteLine($"  - Running with {numFun}: {compiler.Exe} {args}");
-            using (var p = Process.Start(compiler.Exe, args))
+            using (var p = new Process())
             {
-                // todo: pass in compiler timeout option
+                p.StartInfo.FileName = compiler.Exe;
+                p.StartInfo.Arguments = args;
+                foreach (string k in compiler.EnvironmentVariables.Keys)
+                    p.StartInfo.EnvironmentVariables[k] = compiler.EnvironmentVariables[k];
+
+                watch.Start();
+                p.Start();
                 p.WaitForExit();
+                watch.Stop();
                 if (p.ExitCode != 0)
                 {
-                    watch.Stop();
                     Console.WriteLine($"  ! Compilation failed for '{compiler.Exe} {args}'");
                     Thread.Sleep(2500);
                     return null;
                 }
             }
 
-            // todo: also track memory consumption
-            watch.Stop();
             Console.WriteLine($"  - Took {watch.Elapsed}");
             Console.WriteLine();
             return watch.Elapsed;
@@ -198,115 +216,219 @@ namespace CompilerBenchmarker
         static IEnumerable<CompilerBenchmark> RunBenchmarks(
             List<Compiler> compilers, int numberAtStart, int numberOfSteps, int increaseOnStep)
         {
-            var codeExt = compilers
-                .Select(x => $"\\d.{x.Extension}$")
-                .Distinct();
-            var notCodeExt = codeExt.Join("|") + @"|\.csv$|\.txt$|\.csproj$|\.fsproj";
-            Action<FileInfo> toDelete = fileInfo => {
-                if (!Regex.IsMatch(fileInfo.FullName, notCodeExt))
-                {
-                    // Console.WriteLine("Deleting " + fileInfo.FullName);
-                    File.Delete(fileInfo.FullName);
-                }
-            };
+            // Which files to not delete after compiling
+            var doNotDelete = compilers
+                .Select(x => $@"\d\.{x.Extension}$")
+                .Distinct()
+                .Join("|") + @"|\.csv$|\.txt$";
+            var codeGen = new CodeGen();
 
-            var codeGen = new CompilerBenchmarker2.CodeGen2();
-            var failed = new HashSet<Compiler>(new CompilerComparer());
+            // Going from low to high, if X functions fails, so will X+1 so skip it
+            var failed = new HashSet<Compiler>(new CompilerCliComparer());
 
-            // todo: record compiler failure reason
             foreach (var langCompilers in compilers.GroupBy(x => x.Language))
             {
-                // create a directory to isolate files by number of functions
-
                 Console.WriteLine($"Benchmarking {langCompilers.Key}:");
+
                 for (int numFun = numberAtStart, step = 1;
                     step <= numberOfSteps;
                     step += 1, numFun += increaseOnStep)
                 {
-                    var codeFilePath = $"test_{langCompilers.First().Extension}_{numFun}.{langCompilers.First().Extension}";
+                    var ext = langCompilers.First().Extension;
+                    var codeFilePath = $"test_{langCompilers.First().Extension}_{numFun}.{ext}";
 
-                    if (!Directory.Exists(numFun.ToString()))
-                        Directory.CreateDirectory(numFun.ToString());
+                    // Sub test directory
+                    var testdir = numFun.ToString();
+                    if (!Directory.Exists(testdir))
+                        Directory.CreateDirectory(testdir);
 
-                    if (langCompilers.Any(c => c.Exe == "dotnet"))
+                    Directory.SetCurrentDirectory(testdir);
+                    try
                     {
-                        if (File.Exists($"{numFun}/CBT.csproj"))
-                            File.Delete($"{numFun}/CBT.csproj");
-                        File.Copy("CBT.csproj", $"{numFun}/CBT.csproj");
-
-                        if (File.Exists($"{numFun}/CBT.fsproj"))
-                            File.Delete($"{numFun}/CBT.fsproj");
-                        File.WriteAllText($"{numFun}/CBT.fsproj", File.ReadAllText("CBT.fsproj").Replace("$CBT_FILE", codeFilePath));
-                    }
-                    Directory.SetCurrentDirectory(numFun.ToString());
-                    Console.Write($"- Generating {langCompilers.Key} with {numFun} functions.. ");
-
-                    // if (File.Exists(codeFilePath))
-                    // {
-                    //     Console.Write("Exists already.");
-                    // }
-                    // else
-                    // {
-                    //     codeGen.WriteLang(langCompilers.Key, numFun, codeFilePath);
-                    // }
-                    codeGen.WriteLang(langCompilers.Key, numFun, codeFilePath);
-                    Console.WriteLine();
-
-                    foreach (var compiler in langCompilers)
-                    {
-                        // run benchmark
-                        if (failed.Contains(compiler))
+                        // dotnet compiler requires project file
+                        if (langCompilers.Any(c => c.Exe == "dotnet"))
                         {
-                            yield return CompilerBenchmark.Failure(compiler, numFun);
-                            continue;
+                            string csp = "CB.csproj", fsp = "CB.fsproj";
+                            if (File.Exists(csp)) File.Delete(csp);
+                            if (File.Exists(fsp)) File.Delete(fsp);
+                            File.WriteAllText(csp, GetCsProj());
+                            File.WriteAllText(fsp, GetFsProj(codeFilePath));
                         }
 
-                        var bench = RunBenchmark(compiler, codeFilePath, numFun);
-                        if (!bench.HasValue)
-                            failed.Add(compiler);
-                        yield return bench.HasValue
-                            ? CompilerBenchmark.Success(compiler, bench.Value, numFun)
-                            : CompilerBenchmark.Failure(compiler, numFun);
+                        Console.Write($"- Generating {langCompilers.Key} with {numFun} functions");
+                        codeGen.WriteLang(langCompilers.Key, numFun, codeFilePath);
+                        Console.WriteLine();
 
-                        // remove compiler artifacts
-                        FileWalker.Walk(Directory.GetCurrentDirectory(), toDelete, FileWalker.OnDirDoNothing, true);
+                        foreach (var compiler in langCompilers)
+                        {
+                            if (failed.Contains(compiler))
+                            {
+                                yield return CompilerBenchmark.Failure(compiler, numFun);
+                                continue;
+                            }
+
+                            var bench = RunBenchmark(compiler, codeFilePath, numFun);
+                            if (!bench.HasValue)
+                                failed.Add(compiler);
+
+                            yield return bench.HasValue
+                                ? CompilerBenchmark.Success(compiler, bench.Value, numFun)
+                                : CompilerBenchmark.Failure(compiler, numFun);
+
+                            foreach (var file in
+                                new DirectoryInfo(Directory.GetCurrentDirectory()).WalkFiles())
+                            {
+                                if (!Regex.IsMatch(file.FullName, doNotDelete))
+                                    File.Delete(file.FullName);
+                            }
+                        }
                     }
-
-                    // todo: pass in file cleanup options
-                    Directory.SetCurrentDirectory("..");
+                    finally
+                    {
+                        Directory.SetCurrentDirectory("..");
+                    }
                 }
             }
         }
 
+        // Pivot final results nicely, one column per compiler, one row per function count
         static void WriteResults(
             IEnumerable<Compiler> compilersUsed,
             IEnumerable<CompilerBenchmark> marks,
             string resultFileName)
         {
-            var compilerComp = new CompilerComparer();
+            IEqualityComparer<Compiler> comparer = new CompilerCliComparer();
 
             // [Number of Functions -> { Compiler -> Benchmark }]
             var rowData = marks
                 .GroupBy(x => x.NumberFunctions)
                 .Select(x => new {
-                    N = x.Key,
-                    M = x.ToDictionary(y => y.Compiler, compilerComp)
+                    NumFuns = x.Key,
+                    CompilersByCmd = x.ToDictionary(y => y.Compiler, comparer)
                 });
 
             var first = rowData.First();
+
             var header = new List<string> { "Number Functions" }
-                .Concat(first.M.Select(x => x.Key.ToString()))
+                .Concat(first.CompilersByCmd.Select(kv => kv.Key.ToString()))
                 .Join(", ");
 
             var rows = rowData
-                .Select(x => new List<string> { x.N.ToString() }
-                    .Concat(x.M.Select(y => y.Value.SecondsToCompile))
+                .Select(x => new List<string> { x.NumFuns.ToString() }
+                    .Concat(x.CompilersByCmd.Select(kv => kv.Value.SecondsToCompile))
                     .Join(", ")
                 );
 
             var filetext = string.Join("\n", new List<string> { header }.Concat(rows));
             File.WriteAllText(resultFileName, filetext);
             Console.WriteLine($"Wrote benchmark results to {Path.GetFullPath(resultFileName)}");
+        }
+
+        static void StartBench(int numberAtStart, int numberOfSteps, int stepIncreaseNumber)
+        {
+            var compilers = new List<Compiler>
+            {
+                // AOT
+                new Compiler("C",         "c",      "gcc", "--version", "-O2"), // optimized
+                new Compiler("C",         "c",      "gcc", "--version"),        // default
+                new Compiler("C",         "c",    "clang", "--version", "-O2"),
+                new Compiler("C",         "c",    "clang", "--version"),
+                new Compiler("C++",     "cpp",      "g++", "--version", "-O2"),
+                new Compiler("C++",     "cpp",      "g++", "--version"),
+                new Compiler("C++",     "cpp",  "clang++", "--version", "-O2"),
+                new Compiler("C++",     "cpp",  "clang++", "--version"),
+                new Compiler("Rust",     "rs",    "rustc", "--version", "-C opt-level=2"),
+                new Compiler("Rust",     "rs",    "rustc", "--version"),
+                new Compiler("D",         "d",      "dmd", "--version", "-O"),
+                new Compiler("D",         "d",      "dmd", "--version"),
+                new Compiler("D",         "d",      "gdc", "--version", "-O"),
+                new Compiler("D",         "d",      "gdc", "--version"),
+                new Compiler("D",         "d",     "ldc2", "--version", "-O"),
+                new Compiler("D",         "d",     "ldc2", "--version"),
+                new Compiler("OCaml",    "ml", "ocamlopt", "--version", "-O2"),
+                new Compiler("OCaml",    "ml", "ocamlopt", "--version"),
+                new Compiler("Haskell",  "hs",    "stack", "--version", "-O", miscArguments: "ghc"),
+                new Compiler("Haskell",  "hs",    "stack", "--version", miscArguments: "ghc"),
+                new Compiler("Go",       "go",       "go",   "version", "build"),
+
+                // JIT
+                new Compiler("CSharp",   "cs",   "dotnet", "--version", "-c release",
+                    miscArguments: "build --no-restore"),
+                new Compiler("CSharp",   "cs",   "dotnet", "--version",
+                    miscArguments: "build --no-restore"),
+                new Compiler("FSharp",   "fs",   "dotnet", "--version", "-c release",
+                    miscArguments: "build --no-restore"),
+                new Compiler("FSharp",   "fs",   "dotnet", "--version",
+                    miscArguments: "build --no-restore"),
+                // modified to use Java -Xmx4096M -Xms64M
+                new Compiler("Java",   "java",    "javac", "-version",
+                    miscArguments: "-J-Xmx4096M -J-Xms64M"),
+                new Compiler("Scala", "scala",   "scalac", "-version", "-optimise",
+                    envVars: new StringDictionary { ["JAVA_OPTS"] = "-Xms4096M -Xms64M" }),
+                new Compiler("Scala", "scala",   "scalac", "-version",
+                    envVars: new StringDictionary { ["JAVA_OPTS"] = "-Xms4096M -Xms64M" }),
+                new Compiler("Scala", "scala",     "dotc", "-version", "-optimise",
+                    envVars: new StringDictionary { ["JAVA_OPTS"] = "-Xms4096M -Xms64M" }),
+                new Compiler("Scala", "scala",     "dotc", "-version",
+                    envVars: new StringDictionary { ["JAVA_OPTS"] = "-Xms4096M -Xms64M" }),
+                new Compiler("Kotlin",   "kt",  "kotlinc", "-version",
+                    envVars: new StringDictionary { ["JAVA_OPTS"] = "-Xms4096M -Xms64M" }),
+            };
+
+            foreach (var c in compilers.GroupBy(x => x.Exe).Select(x => x.First()))
+            {
+                Console.WriteLine($"Found compiler: {c.Exe} ::: {c.Version}");
+            }
+
+            Console.WriteLine("\n");
+
+            // todo: control keys to skip/abort language/number functions while running
+            // todo: timeouts for compiling
+
+            // Create and step into 'testfiles' directory
+            var home = Environment.GetEnvironmentVariable("HOME");
+            var write_to = $"{home}/testfiles";
+            if (!Directory.Exists(write_to))
+                Directory.CreateDirectory(write_to);
+            Directory.SetCurrentDirectory(write_to);
+
+            // Record system information if it's not there
+            var systemInfoFileName = $"{DateTime.Now.ToString("yyyyMMdd")}_systemInfo.txt";
+            if (!File.Exists(systemInfoFileName))
+            {
+                var info = BasicSystemInfo.Find();
+                var infoText = new[] { info.OS, info.CPU, info.Memory }.Join("\n\n");
+                File.WriteAllText(systemInfoFileName, infoText);
+            }
+
+            // Delete any existing results (not an issue if this date format is used, but if not)
+            var baseFileName = $"results_{DateTime.Now.ToString("yyyyMMddTHHmmss")}";
+            var ongoingResultsFileName = $"{baseFileName}_ongoing.csv";
+            var finalResultFileName = $"{baseFileName}_final.csv";
+            if (File.Exists(ongoingResultsFileName))
+                File.Delete(ongoingResultsFileName);
+            if (File.Exists(finalResultFileName))
+                File.Delete(finalResultFileName);
+
+            // Collect benchmarks while writing ongoing benchmarks
+            var benchmarks = new List<CompilerBenchmark>();
+            using (var ongoing = File.AppendText(ongoingResultsFileName))
+            {
+                // Write header for ongoing results
+                ongoing.WriteLine($"Compiler, Number Functions, Time");
+
+                // Run
+                var lazyBenchmarks = RunBenchmarks(
+                    compilers, numberAtStart, numberOfSteps, stepIncreaseNumber);
+                foreach (var b in lazyBenchmarks)
+                {
+                    benchmarks.Add(b);
+                    ongoing.WriteLine(
+                        $"{b.Compiler.ToString()}, {b.NumberFunctions}, {b.SecondsToCompile}");
+                }
+            }
+
+            WriteResults(compilers, benchmarks, finalResultFileName);
         }
 
         static void Main(string[] args)
@@ -320,95 +442,22 @@ namespace CompilerBenchmarker
 
             try
             {
-                var compilers = new List<Compiler>
-                {
-                    // Native
-                    // new Compiler("C",         "c",      "gcc", "--version", "-O2"), // optimized
-                    // new Compiler("C",         "c",      "gcc", "--version"),        // default
-                    // new Compiler("C",         "c",    "clang", "--version", "-O2"),
-                    // new Compiler("C",         "c",    "clang", "--version"),
-                    // new Compiler("C++",     "cpp",      "g++", "--version", "-O2"),
-                    // new Compiler("C++",     "cpp",      "g++", "--version"),
-                    // new Compiler("C++",     "cpp",    "clang++", "--version", "-O2"),
-                    // new Compiler("C++",     "cpp",    "clang++", "--version"),
-                    // new Compiler("Rust",     "rs",    "rustc", "--version", "-C opt-level=2"),
-                    new Compiler("Rust",     "rs",    "rustc", "--version"),
-                    // new Compiler("D",         "d",      "dmd", "--version", "-O"),
-                    // new Compiler("D",         "d",      "dmd", "--version"),
-                    // new Compiler("D",         "d",      "gdc", "--version", "-O"),
-                    // new Compiler("D",         "d",      "gdc", "--version"),
-                    // new Compiler("D",         "d",     "ldc2", "--version", "-O"),
-                    // new Compiler("D",         "d",     "ldc2", "--version"),
-                    // new Compiler("OCaml",    "ml", "ocamlopt", "--version", "-O2"),
-                    // new Compiler("OCaml",    "ml", "ocamlopt", "--version"),
-                    // new Compiler("Haskell",  "hs",      "ghc", "--version", "-O"),
-                    // new Compiler("Haskell",  "hs",      "stack", "--version", miscArguments: "ghc"),
-                    // new Compiler("Go",       "go",       "go",   "version", "build"),
-                    // VM
-                    // new Compiler("CSharp",   "cs",   "dotnet", "--version", "-o", miscArguments: "/nowarn:1717"),
-                    // new Compiler("CSharp",   "cs",      "dotnet", "--version",       miscArguments: "build --no-restore"),
-                    // new Compiler("FSharp",   "fs",  "dotnet",   "--version", "-o", miscArguments: "--nologo"),
-                    // new Compiler("FSharp",   "fs",  "dotnet",   "--version",       miscArguments: "build --no-restore"),
-                    // new Compiler("Java",   "java",    "javac", "-version",       miscArguments: "-J-Xmx4096M -J-Xms64M"),
-                    // new Compiler("Scala", "scala",   "scalac", "-version", "-optimise"), // modified to use Java -Xmx4096M -Xms64M -Xss4m
-                    // new Compiler("Scala", "scala",   "scalac", "-version"),              // modified to use Java -Xmx4096M -Xms64M -Xss4m
-                    // new Compiler("Scala", "scala",     "dotc", "-version", "-optimise"), // modified to use Java -Xmx4096M -Xss4m
-                    // new Compiler("Scala", "scala",     "dotc", "-version"),              // modified to use Java -Xmx4096M -Xss4m
-                    // new Compiler("Kotlin",   "kt",  "kotlinc", "-version"),              // modified to use Java -Xmx4096M -Xms64M -Xss4m
-                };
-
-                foreach (var c in compilers.GroupBy(x => x.Exe).Select(x => x.First()))
-                {
-                    Console.WriteLine($"Found compiler: {c.Exe} ::: {c.Version}");
-                }
-
-                Console.WriteLine("\n");
-
-                // todo: verify compilers exist on system
-                // todo: control keys to skip/abort language/number functions during runtime
-                // todo: compiler compiling timeout, total timeout
-
-                var home = Environment.GetEnvironmentVariable("HOME");
-                var write_to = $"{home}/testfiles";
-                if (!Directory.Exists(write_to))
-                    Directory.CreateDirectory(write_to);
-
-                Directory.SetCurrentDirectory(write_to);
-
-                var baseFileName = $"results_{DateTime.Now.ToString("yyyyMMddTHHmmss")}";
-                var systemInfoFileName = $"{DateTime.Now.ToString("yyyyMMdd")}_systemInfo.txt";
-                var ongoingResultsFileName = $"{baseFileName}_ongoing.csv";
-                var finalResultFileName = $"{baseFileName}_final.csv";
-                if (!File.Exists(systemInfoFileName))
-                {
-                    var info = BasicSystemInfo.Find();
-                    var infoText = new[] { info.OS, info.CPU, info.Memory }.Join("\n\n");
-                    File.WriteAllText(systemInfoFileName, infoText);
-                }
-                if (File.Exists(ongoingResultsFileName))
-                    File.Delete(ongoingResultsFileName);
-                if (File.Exists(finalResultFileName))
-                    File.Delete(finalResultFileName);
-
-                var allBenchmarks = new List<CompilerBenchmark>(compilers.Count * 100);
-                using (var ongoing = File.AppendText(ongoingResultsFileName))
-                {
-                    ongoing.WriteLine($"Compiler, Number Functions, Time");
-
-                    var benchmarks = RunBenchmarks(compilers, numberAtStart, numberOfSteps, stepIncreaseNumber);
-                    foreach (var b in benchmarks)
-                    {
-                        allBenchmarks.Add(b);
-                        ongoing.WriteLine($"{b.Compiler.ToString()}, {b.NumberFunctions}, {b.SecondsToCompile}");
-                    }
-                }
-
-                WriteResults(compilers, allBenchmarks, finalResultFileName);
+                StartBench(numberAtStart, numberOfSteps, stepIncreaseNumber);
             }
             catch (Exception e)
             {
                 Console.WriteLine(e.ToString());
             }
         }
+
+        static string GetCsProj() =>
+            @"<Project Sdk=""Microsoft.NET.Sdk""><PropertyGroup><OutputType>Exe</OutputType>" +
+            @"<TargetFramework>netcoreapp2.1</TargetFramework></PropertyGroup></Project>";
+
+        static string GetFsProj(string file) =>
+            @"<Project Sdk=""Microsoft.NET.Sdk""><PropertyGroup><OutputType>Exe</OutputType>" +
+            @"<TargetFramework>netcoreapp2.1</TargetFramework></PropertyGroup>" +
+            @"<ItemGroup><Compile Include=""$FILE"" /></ItemGroup></Project>"
+            .Replace("$FILE", file);
     }
 }
