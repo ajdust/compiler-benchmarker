@@ -14,10 +14,9 @@ namespace CompilerBenchmarker
     abstract class BaseImperativeLang : ILang
     {
         public abstract string Extension { get; }
-        protected virtual string EndStatement => ";";
         protected virtual string IntType => "int";
         protected abstract string Main { get; }
-        protected abstract string PrintFunctionName { get; }
+        protected abstract string PrintFunctionFormat { get; }
         protected abstract string FunctionPrefix { get; }
         protected const string IndentSpaces = "    ";
         protected const string P = "p"; // function parameter name
@@ -59,16 +58,16 @@ namespace CompilerBenchmarker
                 case Assignment assignment:
                     var aname = assignment.Variable.VariableName;
                     var aexpr = GetExpression(assignment.AssignedExpression);
-                    return $"{aname} = {aexpr}{EndStatement}";
+                    return $"{aname} = {aexpr};";
                 case VariableDeclaration variableDeclaration:
                     var vname = variableDeclaration.Variable.VariableName;
                     var vexpr = GetExpression(variableDeclaration.Initializer);
-                    return $"{IntType} {vname} = {vexpr}{EndStatement}";
+                    return $"{IntType} {vname} = {vexpr};";
                 case Return ret:
-                    return $"return {GetExpression(ret.Expr)}{EndStatement}";
+                    return $"return {GetExpression(ret.Expr)};";
                 case Print print:
                     var pvname = print.Variable.VariableName;
-                        return $"{PrintFunctionName}({pvname}){EndStatement}";
+                        return $"{PrintFunctionFormat.Replace("$V", pvname)};";
                 default: throw new ArgumentOutOfRangeException(nameof(statement));
             }
         }
@@ -104,7 +103,7 @@ namespace CompilerBenchmarker
     class CSharpLang : BaseImperativeLang
     {
         public override string Extension => "cs";
-        protected override string PrintFunctionName => "Console.WriteLine";
+        protected override string PrintFunctionFormat => "Console.WriteLine($V)";
         protected override string Main => "Main()";
         protected override string FunctionPrefix => "static ";
 
@@ -126,7 +125,7 @@ namespace CompilerBenchmarker
     class JavaLang : BaseImperativeLang
     {
         public override string Extension => "java";
-        protected override string PrintFunctionName => "System.out.println";
+        protected override string PrintFunctionFormat => "System.out.println($V)";
         protected override string Main => "Main()";
         protected override string FunctionPrefix => "static ";
 
@@ -144,22 +143,9 @@ namespace CompilerBenchmarker
     class CLang : BaseImperativeLang
     {
         public override string Extension => "c";
-        protected override string PrintFunctionName => @"printf(""%i"", ";
+        protected override string PrintFunctionFormat => @"printf(""%i"", $V)";
         protected override string Main => "main(void)";
         protected override string FunctionPrefix => "";
-
-        protected override string GetStatement(IStatement statement)
-        {
-            if (statement is Print print)
-            {
-                var pvname = print.Variable.VariableName;
-                return $"{PrintFunctionName} {pvname}){EndStatement}";
-            }
-            else
-            {
-                return base.GetStatement(statement);
-            }
-        }
 
         public override IEnumerable<string> GetProgramLines(Program program)
         {
@@ -173,7 +159,7 @@ namespace CompilerBenchmarker
     class CppLang : BaseImperativeLang
     {
         public override string Extension => "cpp";
-        protected override string PrintFunctionName => "std::cout << ";
+        protected override string PrintFunctionFormat => "std::cout << $V";
         protected override string Main => "main()";
         protected override string FunctionPrefix => "";
 
@@ -189,7 +175,7 @@ namespace CompilerBenchmarker
     class DLang : BaseImperativeLang
     {
         public override string Extension => "d";
-        protected override string PrintFunctionName => "writeln";
+        protected override string PrintFunctionFormat => "writeln($V)";
         protected override string Main => "main()";
         protected override string FunctionPrefix => "";
 
@@ -202,62 +188,13 @@ namespace CompilerBenchmarker
         }
     }
 
-    class GoLang : BaseImperativeLang
-    {
-        public override string Extension => "go";
-        protected override string PrintFunctionName => "fmt.Println";
-        protected override string Main => "main()";
-        protected override string FunctionPrefix => "func ";
-        protected override string EndStatement => "";
 
-        protected override string GetStatement(IStatement statement)
-        {
-            if (statement is VariableDeclaration variableDeclaration)
-            {
-                var vname = variableDeclaration.Variable.VariableName;
-                var vexpr = GetExpression(variableDeclaration.Initializer);
-                return $"{vname} := {vexpr}{EndStatement}";
-            }
-            else
-            {
-                return base.GetStatement(statement);
-            }
-        }
-
-        protected override IEnumerable<string> GetFunctionDeclarationLines(FunctionDeclaration fun)
-        {
-            if (fun is MainFunctionDeclaration main)
-            {
-                yield return $"{FunctionPrefix}{Main} {{";
-                foreach (var statement in fun.Statements.Where(x => !(x is Return)))
-                    yield return $"    {GetStatement(statement)}";
-                yield return "}";
-            }
-            else
-            {
-                yield return $"{FunctionPrefix}{fun.FunctionName}({P} {IntType}) {IntType} {{";
-                foreach (var statement in fun.Statements)
-                    yield return $"    {GetStatement(statement)}";
-                yield return "}";
-            }
-        }
-
-        public override IEnumerable<string> GetProgramLines(Program program)
-        {
-            yield return @"package main";
-            yield return @"import(""fmt"")";
-            yield return "";
-            foreach (var line in GetProgramCoreLines(program))
-                yield return line;
-        }
-    }
-
-    abstract class BaseExpressionLang : ILang
+    abstract class BaseOtherLang : ILang
     {
         public abstract string Extension { get; }
         protected abstract string IntType { get; }
         protected abstract string Main { get; }
-        protected abstract string PrintFunctionName { get; }
+        protected abstract string PrintFunctionFormat { get; }
         protected abstract string FunctionPrefix { get; }
         protected abstract string AssignmentOperator { get; }
         protected abstract string MutableDeclaration { get; }
@@ -266,7 +203,8 @@ namespace CompilerBenchmarker
         protected virtual string IndentSpaces => "    ";
         protected virtual string FunctionWrapStart => "{";
         protected virtual string FunctionWrapEnd => "}";
-        protected virtual string FunctionType => ":";
+        protected virtual string VariableTypeIndicator => ": ";
+        protected virtual string FunctionTypeIndicator => ": ";
         protected virtual string P => "p";
 
         protected virtual string GetBinaryOperator(BinaryOperator op)
@@ -290,7 +228,8 @@ namespace CompilerBenchmarker
                 case Literal literal: return literal.Text;
                 case Variable variable: return variable.VariableName;
                 case FunctionCall functionCall:
-                    return $"{functionCall.FunctionName}{(ML ? " " : "")}({GetExpression(functionCall.Argument)})";
+                    var s = ML ? " " : "";
+                    return $"{functionCall.FunctionName}{s}({GetExpression(functionCall.Argument)})";
                 case BinaryOperation binOp:
                     var left = GetExpression(binOp.LeftOperand);
                     var right = GetExpression(binOp.RightOperand);
@@ -311,15 +250,13 @@ namespace CompilerBenchmarker
                     var vname = variableDeclaration.Variable.VariableName;
                     var vexpr = GetExpression(variableDeclaration.Initializer);
                     return (assignedTo.Contains(variableDeclaration.Variable))
-                        ? $"{MutableDeclaration}{vname}: {IntType} = {vexpr}"
-                        : $"{ImmutableDeclaration}{vname}: {IntType} = {vexpr}";
+                        ? $"{MutableDeclaration}{vname}{VariableTypeIndicator}{IntType} = {vexpr}"
+                        : $"{ImmutableDeclaration}{vname}{VariableTypeIndicator}{IntType} = {vexpr}";
                 case Return ret:
                     return GetExpression(ret.Expr);
                 case Print print:
                     var pvname = print.Variable.VariableName;
-                    return ML
-                        ? $"{PrintFunctionName} {pvname}"
-                        : $"{PrintFunctionName}({pvname})";
+                    return PrintFunctionFormat.Replace("$V", pvname);
                 default: throw new ArgumentOutOfRangeException(nameof(statement));
             }
         }
@@ -332,7 +269,7 @@ namespace CompilerBenchmarker
             var isMain = fun is MainFunctionDeclaration;
             yield return isMain
                 ? $"{Main} {FunctionWrapStart}"
-                : $"{FunctionPrefix} {fun.FunctionName}({P}: {IntType}){FunctionType} {IntType} {FunctionWrapStart}";
+                : $"{FunctionPrefix} {fun.FunctionName}({P}{VariableTypeIndicator}{IntType}){FunctionTypeIndicator}{IntType} {FunctionWrapStart}";
 
             foreach (var statement in fun.Statements)
             {
@@ -361,12 +298,55 @@ namespace CompilerBenchmarker
         public abstract IEnumerable<string> GetProgramLines(Program program);
     }
 
-    class ScalaLang : BaseExpressionLang
+    class GoLang : BaseOtherLang
+    {
+        public override string Extension => "go";
+        protected override string IntType => "int";
+        protected override string Main => "func main()";
+        protected override string PrintFunctionFormat => "fmt.Println($V)";
+        protected override string FunctionPrefix => "func";
+        protected override string AssignmentOperator => "=";
+        protected override string MutableDeclaration => "";
+        protected override string ImmutableDeclaration => "";
+        protected override bool ML => false;
+        protected override string IndentSpaces => "\t";
+        protected override string FunctionTypeIndicator => " ";
+        protected override string VariableTypeIndicator => " ";
+
+        protected override string GetStatement(IStatement statement, HashSet<Variable> assignedTo)
+        {
+            if (statement is VariableDeclaration variableDeclaration)
+            {
+                var vname = variableDeclaration.Variable.VariableName;
+                var vexpr = GetExpression(variableDeclaration.Initializer);
+                return $"var {vname} {IntType} = {vexpr}";
+            }
+            else if (statement is Return ret)
+            {
+                return $"return {GetExpression(ret.Expr)}";
+            }
+            else
+            {
+                return base.GetStatement(statement, assignedTo);
+            }
+        }
+
+        public override IEnumerable<string> GetProgramLines(Program program)
+        {
+            yield return @"package main";
+            yield return @"import(""fmt"")";
+            yield return "";
+            foreach (var line in GetProgramCoreLines(program))
+                yield return line;
+        }
+    }
+
+    class ScalaLang : BaseOtherLang
     {
         public override string Extension => "scala";
         protected override string IntType => "Int";
         protected override string Main => "def main(): Unit";
-        protected override string PrintFunctionName => "println";
+        protected override string PrintFunctionFormat => "println($V)";
         protected override string FunctionPrefix => "def";
         protected override string AssignmentOperator => "=";
         protected override string MutableDeclaration => "var ";
@@ -384,12 +364,12 @@ namespace CompilerBenchmarker
         }
     }
 
-    class KotlinLang : BaseExpressionLang
+    class KotlinLang : BaseOtherLang
     {
         public override string Extension => "kt";
         protected override string IntType => "Int";
         protected override string Main => "fun main()";
-        protected override string PrintFunctionName => "println";
+        protected override string PrintFunctionFormat => "println($V)";
         protected override string FunctionPrefix => "fun";
         protected override string AssignmentOperator => "=";
         protected override string MutableDeclaration => "var ";
@@ -426,12 +406,12 @@ namespace CompilerBenchmarker
         }
     }
 
-    class OCamlLang : BaseExpressionLang
+    class OCamlLang : BaseOtherLang
     {
         public override string Extension => "ml";
         protected override string IntType => "int";
         protected override string Main => "let main ()";
-        protected override string PrintFunctionName => @"Printf.printf ""%i\n""";
+        protected override string PrintFunctionFormat => @"Printf.printf ""%i\n"" $V;;";
         protected override string FunctionPrefix => "let";
         protected override string AssignmentOperator => "=";
         // choosing to ignore OCaml mutable ref for simplicity
@@ -459,7 +439,7 @@ namespace CompilerBenchmarker
         {
             // handle "let <expr> in"
             if (statement is Print print)
-                return $"{PrintFunctionName} {GetExpression(print.Variable)};;";
+                return PrintFunctionFormat.Replace("$V", GetExpression(print.Variable));
             else if (statement is Return ret)
                 return GetExpression(ret.Expr);
             else if (statement is Assignment assignment)
@@ -481,12 +461,12 @@ namespace CompilerBenchmarker
         }
     }
 
-    class FSharpLang : BaseExpressionLang
+    class FSharpLang : BaseOtherLang
     {
         public override string Extension => "fs";
         protected override string IntType => "int";
         protected override string Main => "[<EntryPoint>]\nlet main args";
-        protected override string PrintFunctionName => @"printfn ""%i\n""";
+        protected override string PrintFunctionFormat => @"printfn ""%i\n"" $V";
         protected override string FunctionPrefix => "let";
         protected override string AssignmentOperator => "<-";
         protected override string MutableDeclaration => "let mutable ";
@@ -517,12 +497,12 @@ namespace CompilerBenchmarker
         }
     }
 
-    class HaskellLang : BaseExpressionLang
+    class HaskellLang : BaseOtherLang
     {
         public override string Extension => "hs";
         protected override string IntType => "Int32";
         protected override string Main => "main :: IO ()\nmain ";
-        protected override string PrintFunctionName => @"printf ""%i\n""";
+        protected override string PrintFunctionFormat => @"printf ""%i\n"" $V";
         protected override string FunctionPrefix => "";
         protected override string AssignmentOperator => "=";
         // choose to ignore Haskell's Data.IORef for simplicity
@@ -561,7 +541,7 @@ namespace CompilerBenchmarker
                 case Return ret:
                     return GetExpression(ret.Expr);
                 case Print print:
-                    return $"{PrintFunctionName} {print.Variable.VariableName}";
+                    return PrintFunctionFormat.Replace("$V", print.Variable.VariableName);
                 default: throw new ArgumentOutOfRangeException(nameof(statement));
             }
         }
@@ -606,25 +586,23 @@ namespace CompilerBenchmarker
         }
     }
 
-    class RustLang : BaseExpressionLang
+    class RustLang : BaseOtherLang
     {
         public override string Extension => "rs";
         protected override string IntType => "i32";
         protected override string Main => "fn main()";
-        protected override string PrintFunctionName => @"println!(""{}"", ";
+        protected override string PrintFunctionFormat => @"println!(""{}"", $V)";
         protected override string FunctionPrefix => "fn";
         protected override string AssignmentOperator => "=";
         protected override string MutableDeclaration => "let mut ";
         protected override string ImmutableDeclaration => "let ";
-        protected override string FunctionType => " ->";
+        protected override string FunctionTypeIndicator => " ->";
         protected override bool ML => false;
 
         protected override string GetStatement(
             IStatement statement, HashSet<Variable> assignedTo)
         {
-            if (statement is Print print)
-                return $"{PrintFunctionName} {print.Variable.VariableName});";
-            else if (statement is Return ret)
+            if (statement is Return ret)
                 return GetExpression(ret.Expr);
             else
                 return base.GetStatement(statement, assignedTo) + ";";
@@ -639,17 +617,17 @@ namespace CompilerBenchmarker
         }
     }
 
-    class SwiftLang : BaseExpressionLang
+    class SwiftLang : BaseOtherLang
     {
         public override string Extension => "swift";
         protected override string IntType => "Int";
         protected override string Main => "func main()";
-        protected override string PrintFunctionName => @"print";
+        protected override string PrintFunctionFormat => @"print($V)";
         protected override string FunctionPrefix => "func";
         protected override string AssignmentOperator => "=";
         protected override string MutableDeclaration => "var ";
         protected override string ImmutableDeclaration => "let ";
-        protected override string FunctionType => " ->";
+        protected override string FunctionTypeIndicator => " ->";
         protected override bool ML => false;
 
         protected override string GetExpression(IExpr expr)
@@ -678,12 +656,12 @@ namespace CompilerBenchmarker
         }
     }
 
-    class NimLang : BaseExpressionLang
+    class NimLang : BaseOtherLang
     {
         public override string Extension => "nim";
         protected override string IntType => "int32";
         protected override string Main => "proc main()";
-        protected override string PrintFunctionName => @"echo";
+        protected override string PrintFunctionFormat => @"echo $V";
         protected override string FunctionPrefix => "proc";
         protected override string AssignmentOperator => "=";
         protected override string MutableDeclaration => "var ";
@@ -715,19 +693,19 @@ namespace CompilerBenchmarker
         }
     }
 
-    class CrystalLang : BaseExpressionLang
+    class CrystalLang : BaseOtherLang
     {
         public override string Extension => "cr";
         protected override string IntType => "Int32";
         protected override string Main => "def main()";
-        protected override string PrintFunctionName => @"puts";
+        protected override string PrintFunctionFormat => @"puts $V";
         protected override string FunctionPrefix => "def";
         protected override string AssignmentOperator => "=";
         protected override string MutableDeclaration => "";
         protected override string ImmutableDeclaration => "";
         protected override string FunctionWrapStart => "";
         protected override string FunctionWrapEnd => "end";
-        protected override string FunctionType => " :";
+        protected override string FunctionTypeIndicator => " : ";
         protected override string P => "p ";
         protected override bool ML => false;
 
