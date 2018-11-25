@@ -232,6 +232,7 @@ namespace CompilerBenchmarker
 
             // Going from low to high, if X functions fails, so will X+1 so skip it
             var failed = new HashSet<Compiler>(new CompilerCliComparer());
+            var requireDotnetProjFile = compilers.Any(x => x.Exe == "dotnet");
 
             foreach (var langCompilers in compilers.GroupBy(x => x.Language))
             {
@@ -252,22 +253,22 @@ namespace CompilerBenchmarker
                     Directory.SetCurrentDirectory(testdir);
                     try
                     {
-                        // dotnet compiler requires project file
-                        if (langCompilers.Any(c => c.Exe == "dotnet"))
-                        {
-                            string csp = "CB.csproj", fsp = "CB.fsproj";
-                            if (File.Exists(csp)) File.Delete(csp);
-                            if (File.Exists(fsp)) File.Delete(fsp);
-                            File.WriteAllText(csp, GetCsProj());
-                            File.WriteAllText(fsp, GetFsProj(codeFilePath));
-                        }
-
                         Console.Write($"- Generating {langCompilers.Key} with {numFun} functions");
                         codeGen.WriteLang(langCompilers.Key, numFun, codeFilePath);
                         Console.WriteLine();
 
                         foreach (var compiler in langCompilers)
                         {
+                            // dotnet compiler requires project file
+                            if (requireDotnetProjFile)
+                            {
+                                string csp = "CB.csproj", fsp = "CB.fsproj";
+                                if (File.Exists(csp)) File.Delete(csp);
+                                if (File.Exists(fsp)) File.Delete(fsp);
+                                File.WriteAllText(csp, GetCsProj());
+                                File.WriteAllText(fsp, GetFsProj(codeFilePath));
+                            }
+
                             if (failed.Contains(compiler))
                             {
                                 yield return CompilerBenchmark.Failure(compiler, numFun);
@@ -335,45 +336,11 @@ namespace CompilerBenchmarker
         {
             var compilers = new List<Compiler>
             {
-                // AOT
-                new Compiler("C",         "c",      "gcc", "--version", "-O2"), // optimized
-                new Compiler("C",         "c",      "gcc", "--version"),        // default
-                new Compiler("C",         "c",    "clang", "--version", "-O2"),
-                new Compiler("C",         "c",    "clang", "--version"),
-                new Compiler("C++",     "cpp",      "g++", "--version", "-O2"),
-                new Compiler("C++",     "cpp",      "g++", "--version"),
                 new Compiler("C++",     "cpp",  "clang++", "--version", "-O2"),
-                new Compiler("C++",     "cpp",  "clang++", "--version"),
                 new Compiler("Rust",     "rs",    "rustc", "--version", "-C opt-level=2"),
                 new Compiler("Rust",     "rs",    "rustc", "--version"),
-                new Compiler("D",         "d",      "dmd", "--version", "-O"),
-                new Compiler("D",         "d",      "dmd", "--version"),
-                new Compiler("D",         "d",     "ldc2", "--version", "-O"),
-                new Compiler("D",         "d",     "ldc2", "--version"),
-                new Compiler("OCaml",    "ml", "ocamlopt", "--version", "-O2"),
-                new Compiler("OCaml",    "ml", "ocamlopt", "--version"),
                 new Compiler("Haskell",  "hs",    "stack", "--version", "-O2", miscArguments: "ghc --"),
                 new Compiler("Haskell",  "hs",    "stack", "--version", miscArguments: "ghc"),
-                new Compiler("Go",       "go",       "go",   "version", "build"),
-                new Compiler("Swift", "swift",   "swiftc", "--version", "-O"),
-                new Compiler("Swift", "swift",   "swiftc", "--version"),
-                new Compiler("Nim",     "nim",      "nim", "--version", "compile -d:release --opt:speed"),
-                new Compiler("Nim",     "nim",      "nim", "--version", "compile"),
-                new Compiler("Crystal",  "cr",  "crystal", "--version", "build --release"),
-                new Compiler("Crystal",  "cr",  "crystal", "--version", "build"),
-
-                // JIT
-                new Compiler("CSharp",   "cs",   "dotnet", "--version", "-c release",
-                    miscArguments: "build --no-restore"),
-                new Compiler("CSharp",   "cs",   "dotnet", "--version",
-                    miscArguments: "build --no-restore"),
-                new Compiler("FSharp",   "fs",   "dotnet", "--version", "-c release",
-                    miscArguments: "build --no-restore"),
-                new Compiler("FSharp",   "fs",   "dotnet", "--version",
-                    miscArguments: "build --no-restore"),
-                // modified to use Java -Xmx4096M -Xms64M
-                new Compiler("Java",   "java",    "javac", "-version",
-                    miscArguments: "-J-Xmx4096M -J-Xms64M"),
                 new Compiler("Scala", "scala",   "scalac", "-version", "-opt:l:inline -opt-inline-from:**",
                     envVars: new StringDictionary { ["JAVA_OPTS"] = "-Xms4096M -Xms64M" }),
                 new Compiler("Scala", "scala",   "scalac", "-version",
@@ -382,6 +349,36 @@ namespace CompilerBenchmarker
                     envVars: new StringDictionary { ["JAVA_OPTS"] = "-Xms4096M -Xms64M" }),
                 new Compiler("Kotlin",   "kt",  "kotlinc", "-version",
                     envVars: new StringDictionary { ["JAVA_OPTS"] = "-Xms4096M -Xms64M" }),
+                new Compiler("FSharp",   "fs",   "dotnet", "--version", "-c release",
+                    miscArguments: "build --no-restore"),
+                new Compiler("FSharp",   "fs",   "dotnet", "--version",
+                    miscArguments: "build --no-restore"),
+                new Compiler("OCaml",    "ml", "ocamlopt", "--version", "-O2"),
+                new Compiler("OCaml",    "ml", "ocamlopt", "--version"),
+                new Compiler("Swift", "swift",   "swiftc", "--version", "-O"),
+                new Compiler("Swift", "swift",   "swiftc", "--version"),
+                new Compiler("Nim",     "nim",      "nim", "--version", "compile -d:release --opt:speed"),
+                new Compiler("Nim",     "nim",      "nim", "--version", "compile"),
+                new Compiler("Crystal",  "cr",  "crystal", "--version", "build --release"),
+                new Compiler("Crystal",  "cr",  "crystal", "--version", "build"),
+                new Compiler("CSharp",   "cs",   "dotnet", "--version", "-c release",
+                    miscArguments: "build --no-restore"),
+                new Compiler("CSharp",   "cs",   "dotnet", "--version",
+                    miscArguments: "build --no-restore"),
+                new Compiler("Java",   "java",    "javac", "-version",
+                    miscArguments: "-J-Xmx4096M -J-Xms64M"),
+                new Compiler("Go",       "go",       "go",   "version", "build"),
+                new Compiler("C",         "c",      "gcc", "--version", "-O2"), // optimized
+                new Compiler("C",         "c",      "gcc", "--version"),        // default
+                new Compiler("C",         "c",    "clang", "--version", "-O2"),
+                new Compiler("C",         "c",    "clang", "--version"),
+                new Compiler("C++",     "cpp",      "g++", "--version", "-O2"),
+                new Compiler("C++",     "cpp",      "g++", "--version"),
+                new Compiler("C++",     "cpp",  "clang++", "--version"),
+                new Compiler("D",         "d",      "dmd", "--version", "-O"),
+                new Compiler("D",         "d",      "dmd", "--version"),
+                new Compiler("D",         "d",     "ldc2", "--version", "-O"),
+                new Compiler("D",         "d",     "ldc2", "--version"),
             };
 
             foreach (var c in compilers.GroupBy(x => x.Exe).Select(x => x.First()))
@@ -411,7 +408,7 @@ namespace CompilerBenchmarker
             }
 
             // Delete any existing results (not an issue if this date format is used, but if not)
-            var baseFileName = $"results_{DateTime.Now.ToString("yyyyMMddTHHmmss")}";
+            var baseFileName = $"results_{DateTime.Now.ToString("yyyyMMddTHH")}";
             var ongoingResultsFileName = $"{baseFileName}_ongoing.csv";
             var finalResultFileName = $"{baseFileName}_final.csv";
             if (File.Exists(ongoingResultsFileName))
@@ -442,12 +439,12 @@ namespace CompilerBenchmarker
 
         static void Main(string[] args)
         {
+            // int numberAtStart = 5;
+            // int numberOfSteps = 1;
+            // int stepIncreaseNumber = 0;
             int numberAtStart = 5;
             int numberOfSteps = 1;
-            int stepIncreaseNumber = 0;
-            // int numberAtStart = 5000;
-            // int numberOfSteps = 10;
-            // int stepIncreaseNumber = 5000;
+            int stepIncreaseNumber = 5000;
 
             try
             {

@@ -5,345 +5,6 @@ using System.IO;
 
 namespace CompilerBenchmarker
 {
-    #region Data
-
-    interface IExpr {}
-
-    interface IStatement {}
-
-    // e.g. '45'
-    class Literal : IExpr
-    {
-        public string Text { get; }
-        public Literal(string text) { Text = text; }
-        public Literal(int number) : this(number.ToString()) {}
-    }
-
-    // e.g. 'myVariableName'
-    class Variable : IExpr
-    {
-        public string VariableName { get; }
-        public bool IsFunctionParameter { get; }
-        public Variable(string name, bool isFunctionParameter = false)
-        {
-            VariableName = name;
-            IsFunctionParameter = isFunctionParameter;
-        }
-        public override int GetHashCode() => VariableName.GetHashCode();
-        public override bool Equals(object obj) =>
-            obj is Variable v && v.VariableName == VariableName;
-    }
-
-    // e.g. 'myFunction(x0)'
-    class FunctionCall : IExpr
-    {
-        public string FunctionName { get; }
-        public IExpr Argument { get; }
-        public FunctionCall(string name, IExpr argument)
-        {
-            FunctionName = name;
-            Argument = argument;
-        }
-    }
-
-    // e.g. '<expr> * <expr>'
-    enum BinaryOperator { Plus, Minus, Multiply, BitAnd, BitOr, Xor }
-    class BinaryOperation : IExpr
-    {
-        public IExpr LeftOperand { get; }
-        public IExpr RightOperand { get; }
-        public BinaryOperator Operator { get; }
-
-        public BinaryOperation(IExpr left, BinaryOperator op, IExpr right)
-        {
-            LeftOperand = left;
-            Operator = op;
-            RightOperand = right;
-        }
-    }
-
-    // e.g. 'myVariableName = <expr>'
-    class Assignment : IStatement
-    {
-        public Variable Variable { get; }
-        public IExpr AssignedExpression { get; }
-        public Assignment(Variable variable, IExpr assignedExpression)
-        {
-            Variable = variable;
-            AssignedExpression = assignedExpression;
-        }
-    }
-
-    // e.g. 'int myVariableName = <expr>'
-    class VariableDeclaration : IStatement
-    {
-        public Variable Variable { get; }
-        public IExpr Initializer { get; }
-        public VariableDeclaration(Variable variable, IExpr initializer)
-        {
-            Variable = variable;
-            Initializer = initializer;
-        }
-    }
-
-    // e.g. 'return myVariableName'
-    class Return : IStatement
-    {
-        public IExpr Expr { get; }
-        public Return(IExpr expr) => Expr = expr;
-    }
-
-    // e.g. 'print(myVariableName)'
-    class Print : IStatement
-    {
-        public Variable Variable { get; }
-        public Print(Variable variable) => Variable = variable;
-    }
-
-    interface IFunctionDeclaration {}
-
-    // e.g. 'int f0(int x0) { ... }'
-    class FunctionDeclaration : IFunctionDeclaration
-    {
-        public const string Parameter = "p";
-        public string FunctionName { get; }
-        public IList<IStatement> Statements { get; }
-        public FunctionDeclaration(string functionName, IList<IStatement> statements)
-        {
-            FunctionName = functionName;
-            Statements = statements;
-        }
-
-        public override int GetHashCode() => FunctionName.GetHashCode();
-        public override bool Equals(object obj) =>
-            obj is FunctionDeclaration f && f.FunctionName == FunctionName;
-    }
-
-    // e.g. 'int main(void) { ... }'
-    class MainFunctionDeclaration : FunctionDeclaration
-    {
-        public MainFunctionDeclaration(string functionName, IList<IStatement> statements)
-            : base(functionName, statements)
-        {
-        }
-    }
-
-    class Program
-    {
-        public MainFunctionDeclaration Main { get; }
-        public ICollection<FunctionDeclaration> Functions { get; }
-        public Program(MainFunctionDeclaration main, ICollection<FunctionDeclaration> functions)
-        {
-            Main = main;
-            Functions = functions;
-        }
-    }
-
-    #endregion Data
-
-    #region Program Generator
-
-    static class ProgramGenerator
-    {
-        public static bool TrueOrFalse(this Random r) => r.Next(1, 3) == 1;
-        public static T From<T>(this Random r, IReadOnlyCollection<T> collection) =>
-            collection.ElementAt(r.Next(0, collection.Count));
-
-        public static BinaryOperator Operator(this Random random)
-        {
-            switch (random.Next(1, 7))
-            {
-                case 1: return BinaryOperator.BitAnd;
-                case 2: return BinaryOperator.Minus;
-                case 3: return BinaryOperator.Multiply;
-                case 4: return BinaryOperator.BitOr;
-                case 5: return BinaryOperator.Plus;
-                case 6: return BinaryOperator.Xor;
-                default: return BinaryOperator.Xor;
-            }
-        }
-
-        public static IExpr Expression(
-            this Random random,
-            IReadOnlyCollection<Variable> declaredVariables,
-            IReadOnlyCollection<FunctionDeclaration> declaredFunctions)
-        {
-            switch (random.Next(1, 5))
-            {
-                case 1:
-                    return new Literal(random.Next(0, 100));
-                case 2:
-                    return declaredVariables.Any()
-                        ? random.From(declaredVariables)
-                        : (IExpr)new Literal(random.Next(0, 100));
-                case 3:
-                    if (declaredFunctions.Any())
-                    {
-                        return declaredVariables.Any()
-                            ? new FunctionCall(
-                                random.From(declaredFunctions).FunctionName,
-                                random.From(declaredVariables))
-                            : new FunctionCall(
-                                random.From(declaredFunctions).FunctionName,
-                                new Literal(random.Next(0, 100)));
-                    }
-                    else
-                    {
-                        return new Literal(random.Next(0, 100));
-                    }
-                default: return new BinaryOperation(
-                    random.Expression(declaredVariables, declaredFunctions),
-                    random.Operator(),
-                    random.Expression(declaredVariables, declaredFunctions));
-            }
-        }
-
-        public static Assignment Assignment(
-            this Random random,
-            IReadOnlyCollection<Variable> declaredVariables,
-            IReadOnlyCollection<FunctionDeclaration> declaredFunctions)
-        {
-            var to = random.From(declaredVariables);
-
-            // prevent assigning to function parameter
-            while (to.IsFunctionParameter)
-            {
-                to = random.From(declaredVariables);
-            }
-
-            var expr = random.Expression(declaredVariables, declaredFunctions);
-
-            // prevent variable self-assignments e.g. 'x0 = x0'
-            while (expr is Variable v && v.VariableName == to.VariableName)
-            {
-                expr = random.Expression(declaredVariables, declaredFunctions);
-            }
-
-            // ensure all initializers are used; e.g. no 'int a = 10; a = 20;'
-            expr = new BinaryOperation(to, random.Operator(), expr);
-            return new Assignment(to, expr);
-        }
-
-        public static VariableDeclaration MainVariableDeclaration(
-            this Random random,
-            IReadOnlyCollection<Variable> declaredVariables,
-            IReadOnlyCollection<FunctionDeclaration> declaredFunctions)
-        {
-            IExpr expr = random.Expression(declaredVariables, declaredFunctions);
-
-            // the main print prevents unused variable warnings
-            foreach (var v in declaredVariables)
-                expr = new BinaryOperation(expr, random.Operator(), v);
-
-            return new VariableDeclaration(new Variable("m"), expr);
-        }
-
-        public static VariableDeclaration VariableDeclaration(
-            this Random random,
-            IReadOnlyCollection<Variable> declaredVariables,
-            IReadOnlyCollection<FunctionDeclaration> declaredFunctions) =>
-            new VariableDeclaration(
-                new Variable($"x{declaredVariables.Count}"),
-                random.Expression(declaredVariables, declaredFunctions));
-
-        public static Print Print(
-            this Random random,
-            IReadOnlyCollection<Variable> declaredVariables) =>
-            new Print(random.From(declaredVariables));
-
-        public static Return Return(
-            this Random random,
-            IReadOnlyCollection<Variable> declaredVariables,
-            IReadOnlyCollection<FunctionDeclaration> declaredFunctions)
-        {
-            IExpr expr = random.Expression(declaredVariables, declaredFunctions);
-
-            // function return prevents unused variable warnings
-            foreach (var v in declaredVariables)
-                expr = new BinaryOperation(expr, random.Operator(), v);
-
-            return new Return(expr);
-        }
-
-        public static FunctionDeclaration FunctionDeclaration(
-            this Random random,
-            IReadOnlyCollection<FunctionDeclaration> decFuns,
-            int maxStatementsPerFunction, bool isMain = false)
-        {
-            var numStatements = random.Next(1, maxStatementsPerFunction);
-            var statements = new List<IStatement>();
-            var decVars = new List<Variable>();
-
-            // Add variable for argument
-            if (!isMain)
-                decVars.Add(new Variable("p", true));
-
-            // Variable declaration to start off every function
-            // If possible, used the last function declaration to ensure all are used
-            var firstDecVar = decFuns.Any()
-                ? new VariableDeclaration(
-                    new Variable($"x{decVars.Count}"),
-                    new FunctionCall(
-                        decFuns.Last().FunctionName,
-                        new Literal(random.Next(0, 100))))
-                : random.VariableDeclaration(decVars, decFuns);
-
-            statements.Add(firstDecVar);
-            decVars.Add(firstDecVar.Variable);
-
-            // Random statements
-            for (var _ = 0; _ < numStatements; _ += 1)
-            {
-                if (random.TrueOrFalse())
-                {
-                    var decVar = random.VariableDeclaration(decVars, decFuns);
-                    statements.Add(decVar);
-                    decVars.Add(decVar.Variable);
-                }
-                else
-                {
-                    var assignment = random.Assignment(decVars, decFuns);
-                    statements.Add(assignment);
-                }
-            }
-
-            if (isMain)
-            {
-                var m = random.MainVariableDeclaration(decVars, decFuns);
-                statements.Add(m);
-                statements.Add(new Print(m.Variable));
-                statements.Add(new Return(new Literal(0)));
-                return new MainFunctionDeclaration($"main", statements);
-            }
-            else
-            {
-                statements.Add(random.Return(decVars, decFuns));
-                return new FunctionDeclaration($"f{decFuns.Count}", statements);
-            }
-        }
-
-        public static MainFunctionDeclaration MainFunction(
-            this Random random,
-            IReadOnlyCollection<FunctionDeclaration> decFuns,
-            int maxStatementsPerFunction) =>
-            (MainFunctionDeclaration)FunctionDeclaration(
-                random, decFuns, maxStatementsPerFunction, true);
-
-        public static Program RandomProgram(Random random, int functionCount, int maxStatementsPerFunction)
-        {
-            var functions = new List<FunctionDeclaration>();
-            for (var _ = 0; _ < functionCount; _ += 1)
-                functions.Add(random.FunctionDeclaration(functions, maxStatementsPerFunction));
-
-            var main = random.MainFunction(functions, maxStatementsPerFunction);
-            return new Program(main, functions);
-        }
-    }
-
-    #endregion
-
-    #region Languages
-
     interface ILang
     {
         string Extension { get; }
@@ -358,6 +19,7 @@ namespace CompilerBenchmarker
         protected abstract string Main { get; }
         protected abstract string PrintFunctionName { get; }
         protected abstract string FunctionPrefix { get; }
+        protected const string IndentSpaces = "    ";
         protected const string P = "p"; // function parameter name
 
         protected virtual string GetBinaryOperator(BinaryOperator op)
@@ -423,6 +85,19 @@ namespace CompilerBenchmarker
             yield return "}";
         }
 
+        public virtual IEnumerable<string> GetProgramCoreLines(Program program)
+        {
+            foreach (var fun in program.Functions)
+            {
+                foreach (var line in GetFunctionDeclarationLines(fun))
+                    yield return line;
+                yield return "";
+            }
+
+            foreach (var line in GetFunctionDeclarationLines(program.Main))
+                yield return line;
+        }
+
         public abstract IEnumerable<string> GetProgramLines(Program program);
     }
 
@@ -441,16 +116,8 @@ namespace CompilerBenchmarker
             yield return "{";
             yield return "    static class GeneratedFunctions";
             yield return "    {";
-            foreach (var fun in program.Functions)
-            {
-                foreach (var line in GetFunctionDeclarationLines(fun))
-                    yield return $"        {line}";
-                yield return "";
-            }
-
-            foreach (var line in GetFunctionDeclarationLines(program.Main))
-                yield return $"        {line}";
-
+            foreach (var line in GetProgramCoreLines(program))
+                yield return $"{IndentSpaces}{IndentSpaces}{line}";
             yield return "    }";
             yield return "}";
         }
@@ -468,16 +135,8 @@ namespace CompilerBenchmarker
             yield return "package GeneratedCode;";
             yield return "";
             yield return "class GeneratedFunctions {";
-            foreach (var fun in program.Functions)
-            {
-                foreach (var line in GetFunctionDeclarationLines(fun))
-                    yield return $"    {line}";
-                yield return "";
-            }
-
-            foreach (var line in GetFunctionDeclarationLines(program.Main))
-                yield return $"    {line}";
-
+            foreach (var line in GetProgramCoreLines(program))
+                yield return $"{IndentSpaces}{line}";
             yield return "}";
         }
     }
@@ -506,14 +165,7 @@ namespace CompilerBenchmarker
         {
             yield return "#include <stdio.h>";
             yield return "";
-            foreach (var fun in program.Functions)
-            {
-                foreach (var line in GetFunctionDeclarationLines(fun))
-                    yield return line;
-                yield return "";
-            }
-
-            foreach (var line in GetFunctionDeclarationLines(program.Main))
+            foreach (var line in GetProgramCoreLines(program))
                 yield return line;
         }
     }
@@ -529,14 +181,7 @@ namespace CompilerBenchmarker
         {
             yield return "#include <iostream>";
             yield return "";
-            foreach (var fun in program.Functions)
-            {
-                foreach (var line in GetFunctionDeclarationLines(fun))
-                    yield return line;
-                yield return "";
-            }
-
-            foreach (var line in GetFunctionDeclarationLines(program.Main))
+            foreach (var line in GetProgramCoreLines(program))
                 yield return line;
         }
     }
@@ -552,14 +197,7 @@ namespace CompilerBenchmarker
         {
             yield return "import std.stdio;";
             yield return "";
-            foreach (var fun in program.Functions)
-            {
-                foreach (var line in GetFunctionDeclarationLines(fun))
-                    yield return line;
-                yield return "";
-            }
-
-            foreach (var line in GetFunctionDeclarationLines(program.Main))
+            foreach (var line in GetProgramCoreLines(program))
                 yield return line;
         }
     }
@@ -609,14 +247,7 @@ namespace CompilerBenchmarker
             yield return @"package main";
             yield return @"import(""fmt"")";
             yield return "";
-            foreach (var fun in program.Functions)
-            {
-                foreach (var line in GetFunctionDeclarationLines(fun))
-                    yield return line;
-                yield return "";
-            }
-
-            foreach (var line in GetFunctionDeclarationLines(program.Main))
+            foreach (var line in GetProgramCoreLines(program))
                 yield return line;
         }
     }
@@ -700,7 +331,7 @@ namespace CompilerBenchmarker
 
             var isMain = fun is MainFunctionDeclaration;
             yield return isMain
-                ? $"{FunctionPrefix} {Main} {FunctionWrapStart}"
+                ? $"{Main} {FunctionWrapStart}"
                 : $"{FunctionPrefix} {fun.FunctionName}({P}: {IntType}){FunctionType} {IntType} {FunctionWrapStart}";
 
             foreach (var statement in fun.Statements)
@@ -710,7 +341,21 @@ namespace CompilerBenchmarker
 
                 yield return $"{IndentSpaces}{GetStatement(statement, assignedTo)}";
             }
-            yield return FunctionWrapEnd;
+            if (!string.IsNullOrEmpty(FunctionWrapEnd))
+                yield return FunctionWrapEnd;
+        }
+
+        protected virtual IEnumerable<string> GetProgramCoreLines(Program program)
+        {
+            foreach (var fun in program.Functions)
+            {
+                foreach (var line in GetFunctionDeclarationLines(fun))
+                    yield return line;
+                yield return "";
+            }
+
+            foreach (var line in GetFunctionDeclarationLines(program.Main))
+                yield return line;
         }
 
         public abstract IEnumerable<string> GetProgramLines(Program program);
@@ -720,7 +365,7 @@ namespace CompilerBenchmarker
     {
         public override string Extension => "scala";
         protected override string IntType => "Int";
-        protected override string Main => "main(): Unit";
+        protected override string Main => "def main(): Unit";
         protected override string PrintFunctionName => "println";
         protected override string FunctionPrefix => "def";
         protected override string AssignmentOperator => "=";
@@ -733,16 +378,8 @@ namespace CompilerBenchmarker
         public override IEnumerable<string> GetProgramLines(Program program)
         {
             yield return "object GeneratedFunctions {";
-            foreach (var fun in program.Functions)
-            {
-                foreach (var line in GetFunctionDeclarationLines(fun))
-                    yield return $"{IndentSpaces}{line}";
-                yield return "";
-            }
-
-            foreach (var line in GetFunctionDeclarationLines(program.Main))
+            foreach (var line in GetProgramCoreLines(program))
                 yield return $"{IndentSpaces}{line}";
-
             yield return "}";
         }
     }
@@ -751,7 +388,7 @@ namespace CompilerBenchmarker
     {
         public override string Extension => "kt";
         protected override string IntType => "Int";
-        protected override string Main => "main()";
+        protected override string Main => "fun main()";
         protected override string PrintFunctionName => "println";
         protected override string FunctionPrefix => "fun";
         protected override string AssignmentOperator => "=";
@@ -783,16 +420,8 @@ namespace CompilerBenchmarker
         public override IEnumerable<string> GetProgramLines(Program program)
         {
             yield return "class GeneratedFunctions {";
-            foreach (var fun in program.Functions)
-            {
-                foreach (var line in GetFunctionDeclarationLines(fun))
-                    yield return $"{IndentSpaces}{line}";
-                yield return "";
-            }
-
-            foreach (var line in GetFunctionDeclarationLines(program.Main))
+            foreach (var line in GetProgramCoreLines(program))
                 yield return $"{IndentSpaces}{line}";
-
             yield return "}";
         }
     }
@@ -801,7 +430,7 @@ namespace CompilerBenchmarker
     {
         public override string Extension => "ml";
         protected override string IntType => "int";
-        protected override string Main => "main ()";
+        protected override string Main => "let main ()";
         protected override string PrintFunctionName => @"Printf.printf ""%i\n""";
         protected override string FunctionPrefix => "let";
         protected override string AssignmentOperator => "=";
@@ -845,14 +474,7 @@ namespace CompilerBenchmarker
 
         public override IEnumerable<string> GetProgramLines(Program program)
         {
-            foreach (var fun in program.Functions)
-            {
-                foreach (var line in GetFunctionDeclarationLines(fun))
-                    yield return line;
-                yield return "";
-            }
-
-            foreach (var line in GetFunctionDeclarationLines(program.Main))
+            foreach (var line in GetProgramCoreLines(program))
                 yield return line;
             yield return "";
             yield return "main ()";
@@ -863,7 +485,7 @@ namespace CompilerBenchmarker
     {
         public override string Extension => "fs";
         protected override string IntType => "int";
-        protected override string Main => "main args";
+        protected override string Main => "[<EntryPoint>]\nlet main args";
         protected override string PrintFunctionName => @"printfn ""%i\n""";
         protected override string FunctionPrefix => "let";
         protected override string AssignmentOperator => "<-";
@@ -889,15 +511,7 @@ namespace CompilerBenchmarker
 
         public override IEnumerable<string> GetProgramLines(Program program)
         {
-            foreach (var fun in program.Functions)
-            {
-                foreach (var line in GetFunctionDeclarationLines(fun))
-                    yield return line;
-                yield return "";
-            }
-
-            yield return "[<EntryPoint>]";
-            foreach (var line in GetFunctionDeclarationLines(program.Main))
+            foreach (var line in GetProgramCoreLines(program))
                 yield return line;
             yield return $"{IndentSpaces}0";
         }
@@ -969,7 +583,6 @@ namespace CompilerBenchmarker
 
                 yield return $"{IndentSpaces}{GetStatement(statement, assignedTo)}";
             }
-            yield return FunctionWrapEnd;
         }
 
         public override IEnumerable<string> GetProgramLines(Program program)
@@ -988,14 +601,7 @@ namespace CompilerBenchmarker
             yield return "a ^^^ b = a `xor` b";
             yield return "";
 
-            foreach (var fun in program.Functions)
-            {
-                foreach (var line in GetFunctionDeclarationLines(fun))
-                    yield return line;
-                yield return "";
-            }
-
-            foreach (var line in GetFunctionDeclarationLines(program.Main))
+            foreach (var line in GetProgramCoreLines(program))
                 yield return line;
         }
     }
@@ -1004,7 +610,7 @@ namespace CompilerBenchmarker
     {
         public override string Extension => "rs";
         protected override string IntType => "i32";
-        protected override string Main => "main()";
+        protected override string Main => "fn main()";
         protected override string PrintFunctionName => @"println!(""{}"", ";
         protected override string FunctionPrefix => "fn";
         protected override string AssignmentOperator => "=";
@@ -1028,14 +634,7 @@ namespace CompilerBenchmarker
         {
             yield return "#![allow(unused_parens)]\n";
 
-            foreach (var fun in program.Functions)
-            {
-                foreach (var line in GetFunctionDeclarationLines(fun))
-                    yield return line;
-                yield return "";
-            }
-
-            foreach (var line in GetFunctionDeclarationLines(program.Main))
+            foreach (var line in GetProgramCoreLines(program))
                 yield return line;
         }
     }
@@ -1044,7 +643,7 @@ namespace CompilerBenchmarker
     {
         public override string Extension => "swift";
         protected override string IntType => "Int";
-        protected override string Main => "main()";
+        protected override string Main => "func main()";
         protected override string PrintFunctionName => @"print";
         protected override string FunctionPrefix => "func";
         protected override string AssignmentOperator => "=";
@@ -1072,16 +671,8 @@ namespace CompilerBenchmarker
 
         public override IEnumerable<string> GetProgramLines(Program program)
         {
-            foreach (var fun in program.Functions)
-            {
-                foreach (var line in GetFunctionDeclarationLines(fun))
-                    yield return line;
-                yield return "";
-            }
-
-            foreach (var line in GetFunctionDeclarationLines(program.Main))
+            foreach (var line in GetProgramCoreLines(program))
                 yield return line;
-
             yield return "";
             yield return "main()";
         }
@@ -1091,7 +682,7 @@ namespace CompilerBenchmarker
     {
         public override string Extension => "nim";
         protected override string IntType => "int32";
-        protected override string Main => "main()";
+        protected override string Main => "proc main()";
         protected override string PrintFunctionName => @"echo";
         protected override string FunctionPrefix => "proc";
         protected override string AssignmentOperator => "=";
@@ -1117,16 +708,8 @@ namespace CompilerBenchmarker
 
         public override IEnumerable<string> GetProgramLines(Program program)
         {
-            foreach (var fun in program.Functions)
-            {
-                foreach (var line in GetFunctionDeclarationLines(fun))
-                    yield return line;
-                yield return "";
-            }
-
-            foreach (var line in GetFunctionDeclarationLines(program.Main))
+            foreach (var line in GetProgramCoreLines(program))
                 yield return line;
-
             yield return "";
             yield return "main()";
         }
@@ -1136,7 +719,7 @@ namespace CompilerBenchmarker
     {
         public override string Extension => "cr";
         protected override string IntType => "Int32";
-        protected override string Main => "main()";
+        protected override string Main => "def main()";
         protected override string PrintFunctionName => @"puts";
         protected override string FunctionPrefix => "def";
         protected override string AssignmentOperator => "=";
@@ -1150,22 +733,12 @@ namespace CompilerBenchmarker
 
         public override IEnumerable<string> GetProgramLines(Program program)
         {
-            foreach (var fun in program.Functions)
-            {
-                foreach (var line in GetFunctionDeclarationLines(fun))
-                    yield return line;
-                yield return "";
-            }
-
-            foreach (var line in GetFunctionDeclarationLines(program.Main))
+            foreach (var line in GetProgramCoreLines(program))
                 yield return line;
-
             yield return "";
             yield return "main()";
         }
     }
-
-    #endregion
 
     public class CodeGen
     {
