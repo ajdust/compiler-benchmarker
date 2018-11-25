@@ -14,10 +14,11 @@ namespace CompilerBenchmarker
     abstract class BaseImperativeLang : ILang
     {
         public abstract string Extension { get; }
-        protected virtual string IntType => "int";
         protected abstract string Main { get; }
         protected abstract string PrintFunctionFormat { get; }
         protected abstract string FunctionPrefix { get; }
+        protected abstract string ConstIntType { get; }
+        protected virtual string IntType => "int";
         protected const string IndentSpaces = "    ";
         protected const string P = "p"; // function parameter name
 
@@ -51,7 +52,7 @@ namespace CompilerBenchmarker
             }
         }
 
-        protected virtual string GetStatement(IStatement statement)
+        protected virtual string GetStatement(IStatement statement, HashSet<Variable> assignedTo)
         {
             switch (statement)
             {
@@ -62,7 +63,9 @@ namespace CompilerBenchmarker
                 case VariableDeclaration variableDeclaration:
                     var vname = variableDeclaration.Variable.VariableName;
                     var vexpr = GetExpression(variableDeclaration.Initializer);
-                    return $"{IntType} {vname} = {vexpr};";
+                    return assignedTo.Contains(variableDeclaration.Variable)
+                        ? $"{IntType} {vname} = {vexpr};"
+                        : $"{ConstIntType} {vname} = {vexpr};";
                 case Return ret:
                     return $"return {GetExpression(ret.Expr)};";
                 case Print print:
@@ -74,12 +77,15 @@ namespace CompilerBenchmarker
 
         protected virtual IEnumerable<string> GetFunctionDeclarationLines(FunctionDeclaration fun)
         {
+            var assignedTo = new HashSet<Variable>(
+                fun.Statements.OfType<Assignment>().Select(a => a.Variable));
+
             yield return (fun is MainFunctionDeclaration)
                 ? $"{FunctionPrefix}{IntType} {Main} {{"
-                : $"{FunctionPrefix}{IntType} {fun.FunctionName}({IntType} {P}) {{";
+                : $"{FunctionPrefix}{ConstIntType} {fun.FunctionName}({IntType} {P}) {{";
 
             foreach (var statement in fun.Statements)
-                yield return $"    {GetStatement(statement)}";
+                yield return $"    {GetStatement(statement, assignedTo)}";
 
             yield return "}";
         }
@@ -106,6 +112,7 @@ namespace CompilerBenchmarker
         protected override string PrintFunctionFormat => "Console.WriteLine($V)";
         protected override string Main => "Main()";
         protected override string FunctionPrefix => "static ";
+        protected override string ConstIntType => IntType;
 
         public override IEnumerable<string> GetProgramLines(Program program)
         {
@@ -128,6 +135,7 @@ namespace CompilerBenchmarker
         protected override string PrintFunctionFormat => "System.out.println($V)";
         protected override string Main => "Main()";
         protected override string FunctionPrefix => "static ";
+        protected override string ConstIntType => IntType;
 
         public override IEnumerable<string> GetProgramLines(Program program)
         {
@@ -146,6 +154,7 @@ namespace CompilerBenchmarker
         protected override string PrintFunctionFormat => @"printf(""%i"", $V)";
         protected override string Main => "main(void)";
         protected override string FunctionPrefix => "";
+        protected override string ConstIntType => $"const {IntType}";
 
         public override IEnumerable<string> GetProgramLines(Program program)
         {
@@ -162,6 +171,7 @@ namespace CompilerBenchmarker
         protected override string PrintFunctionFormat => "std::cout << $V";
         protected override string Main => "main()";
         protected override string FunctionPrefix => "";
+        protected override string ConstIntType => $"const {IntType}";
 
         public override IEnumerable<string> GetProgramLines(Program program)
         {
@@ -178,6 +188,7 @@ namespace CompilerBenchmarker
         protected override string PrintFunctionFormat => "writeln($V)";
         protected override string Main => "main()";
         protected override string FunctionPrefix => "";
+        protected override string ConstIntType => $"immutable({IntType})";
 
         public override IEnumerable<string> GetProgramLines(Program program)
         {
@@ -249,7 +260,7 @@ namespace CompilerBenchmarker
                 case VariableDeclaration variableDeclaration:
                     var vname = variableDeclaration.Variable.VariableName;
                     var vexpr = GetExpression(variableDeclaration.Initializer);
-                    return (assignedTo.Contains(variableDeclaration.Variable))
+                    return assignedTo.Contains(variableDeclaration.Variable)
                         ? $"{MutableDeclaration}{vname}{VariableTypeIndicator}{IntType} = {vexpr}"
                         : $"{ImmutableDeclaration}{vname}{VariableTypeIndicator}{IntType} = {vexpr}";
                 case Return ret:
@@ -596,7 +607,7 @@ namespace CompilerBenchmarker
         protected override string AssignmentOperator => "=";
         protected override string MutableDeclaration => "let mut ";
         protected override string ImmutableDeclaration => "let ";
-        protected override string FunctionTypeIndicator => " ->";
+        protected override string FunctionTypeIndicator => " -> ";
         protected override bool ML => false;
 
         protected override string GetStatement(
@@ -627,7 +638,7 @@ namespace CompilerBenchmarker
         protected override string AssignmentOperator => "=";
         protected override string MutableDeclaration => "var ";
         protected override string ImmutableDeclaration => "let ";
-        protected override string FunctionTypeIndicator => " ->";
+        protected override string FunctionTypeIndicator => " -> ";
         protected override bool ML => false;
 
         protected override string GetExpression(IExpr expr)
