@@ -85,7 +85,14 @@ namespace CompilerBenchmarker
             OptimizeArguments = optimizeArguments;
             MiscArguments = miscArguments;
             EnvironmentVariables = envVars ?? new StringDictionary();
-            CheckCompilerAndSetVersion();
+            try
+            {
+                CheckCompilerAndSetVersion();
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"{exe} error", e);
+            }
         }
 
         public override string ToString()
@@ -170,7 +177,7 @@ namespace CompilerBenchmarker
             var isDotnet = compiler.Exe == "dotnet";
             if (isDotnet)
             {
-                using (var p = Process.Start(compiler.Exe, $"restore CBT.{compiler.Extension}proj"))
+                using (var p = Process.Start(compiler.Exe, $"restore CB.{compiler.Extension}proj"))
                 {
                     p.WaitForExit();
                     if (p.ExitCode != 0)
@@ -341,15 +348,19 @@ namespace CompilerBenchmarker
                 new Compiler("Rust",     "rs",    "rustc", "--version"),
                 new Compiler("D",         "d",      "dmd", "--version", "-O"),
                 new Compiler("D",         "d",      "dmd", "--version"),
-                new Compiler("D",         "d",      "gdc", "--version", "-O"),
-                new Compiler("D",         "d",      "gdc", "--version"),
                 new Compiler("D",         "d",     "ldc2", "--version", "-O"),
                 new Compiler("D",         "d",     "ldc2", "--version"),
                 new Compiler("OCaml",    "ml", "ocamlopt", "--version", "-O2"),
                 new Compiler("OCaml",    "ml", "ocamlopt", "--version"),
-                new Compiler("Haskell",  "hs",    "stack", "--version", "-O", miscArguments: "ghc"),
+                new Compiler("Haskell",  "hs",    "stack", "--version", "-O2", miscArguments: "ghc --"),
                 new Compiler("Haskell",  "hs",    "stack", "--version", miscArguments: "ghc"),
                 new Compiler("Go",       "go",       "go",   "version", "build"),
+                new Compiler("Swift", "swift",   "swiftc", "--version", "-O"),
+                new Compiler("Swift", "swift",   "swiftc", "--version"),
+                new Compiler("Nim",     "nim",      "nim", "--version", "compile -d:release --opt:speed"),
+                new Compiler("Nim",     "nim",      "nim", "--version", "compile"),
+                new Compiler("Crystal",  "cr",  "crystal", "--version", "build --release"),
+                new Compiler("Crystal",  "cr",  "crystal", "--version", "build"),
 
                 // JIT
                 new Compiler("CSharp",   "cs",   "dotnet", "--version", "-c release",
@@ -363,11 +374,9 @@ namespace CompilerBenchmarker
                 // modified to use Java -Xmx4096M -Xms64M
                 new Compiler("Java",   "java",    "javac", "-version",
                     miscArguments: "-J-Xmx4096M -J-Xms64M"),
-                new Compiler("Scala", "scala",   "scalac", "-version", "-optimise",
+                new Compiler("Scala", "scala",   "scalac", "-version", "-opt:l:inline -opt-inline-from:**",
                     envVars: new StringDictionary { ["JAVA_OPTS"] = "-Xms4096M -Xms64M" }),
                 new Compiler("Scala", "scala",   "scalac", "-version",
-                    envVars: new StringDictionary { ["JAVA_OPTS"] = "-Xms4096M -Xms64M" }),
-                new Compiler("Scala", "scala",     "dotc", "-version", "-optimise",
                     envVars: new StringDictionary { ["JAVA_OPTS"] = "-Xms4096M -Xms64M" }),
                 new Compiler("Scala", "scala",     "dotc", "-version",
                     envVars: new StringDictionary { ["JAVA_OPTS"] = "-Xms4096M -Xms64M" }),

@@ -23,7 +23,12 @@ namespace CompilerBenchmarker
     class Variable : IExpr
     {
         public string VariableName { get; }
-        public Variable(string name) { VariableName = name; }
+        public bool IsFunctionParameter { get; }
+        public Variable(string name, bool isFunctionParameter = false)
+        {
+            VariableName = name;
+            IsFunctionParameter = isFunctionParameter;
+        }
         public override int GetHashCode() => VariableName.GetHashCode();
         public override bool Equals(object obj) =>
             obj is Variable v && v.VariableName == VariableName;
@@ -96,11 +101,6 @@ namespace CompilerBenchmarker
     }
 
     interface IFunctionDeclaration {}
-
-    static class Constants
-    {
-        public const string P = "p";
-    }
 
     // e.g. 'int f0(int x0) { ... }'
     class FunctionDeclaration : IFunctionDeclaration
@@ -206,7 +206,7 @@ namespace CompilerBenchmarker
             var to = random.From(declaredVariables);
 
             // prevent assigning to function parameter
-            while (to.VariableName == Constants.P)
+            while (to.IsFunctionParameter)
             {
                 to = random.From(declaredVariables);
             }
@@ -276,7 +276,7 @@ namespace CompilerBenchmarker
 
             // Add variable for argument
             if (!isMain)
-                decVars.Add(new Variable(Constants.P));
+                decVars.Add(new Variable("p", true));
 
             // Variable declaration to start off every function
             // If possible, used the last function declaration to ensure all are used
@@ -357,7 +357,8 @@ namespace CompilerBenchmarker
         protected virtual string IntType => "int";
         protected abstract string Main { get; }
         protected abstract string PrintFunctionName { get; }
-        protected abstract string MethodPrefix { get; }
+        protected abstract string FunctionPrefix { get; }
+        protected const string P = "p"; // function parameter name
 
         protected virtual string GetBinaryOperator(BinaryOperator op)
         {
@@ -413,8 +414,8 @@ namespace CompilerBenchmarker
         protected virtual IEnumerable<string> GetFunctionDeclarationLines(FunctionDeclaration fun)
         {
             yield return (fun is MainFunctionDeclaration)
-                ? $"{MethodPrefix}{IntType} {Main} {{"
-                : $"{MethodPrefix}{IntType} {fun.FunctionName}({IntType} {Constants.P}) {{";
+                ? $"{FunctionPrefix}{IntType} {Main} {{"
+                : $"{FunctionPrefix}{IntType} {fun.FunctionName}({IntType} {P}) {{";
 
             foreach (var statement in fun.Statements)
                 yield return $"    {GetStatement(statement)}";
@@ -430,7 +431,7 @@ namespace CompilerBenchmarker
         public override string Extension => "cs";
         protected override string PrintFunctionName => "Console.WriteLine";
         protected override string Main => "Main()";
-        protected override string MethodPrefix => "static ";
+        protected override string FunctionPrefix => "static ";
 
         public override IEnumerable<string> GetProgramLines(Program program)
         {
@@ -460,7 +461,7 @@ namespace CompilerBenchmarker
         public override string Extension => "java";
         protected override string PrintFunctionName => "System.out.println";
         protected override string Main => "Main()";
-        protected override string MethodPrefix => "static ";
+        protected override string FunctionPrefix => "static ";
 
         public override IEnumerable<string> GetProgramLines(Program program)
         {
@@ -486,7 +487,7 @@ namespace CompilerBenchmarker
         public override string Extension => "c";
         protected override string PrintFunctionName => @"printf(""%i"", ";
         protected override string Main => "main(void)";
-        protected override string MethodPrefix => "";
+        protected override string FunctionPrefix => "";
 
         protected override string GetStatement(IStatement statement)
         {
@@ -522,7 +523,7 @@ namespace CompilerBenchmarker
         public override string Extension => "cpp";
         protected override string PrintFunctionName => "std::cout << ";
         protected override string Main => "main()";
-        protected override string MethodPrefix => "";
+        protected override string FunctionPrefix => "";
 
         public override IEnumerable<string> GetProgramLines(Program program)
         {
@@ -545,7 +546,7 @@ namespace CompilerBenchmarker
         public override string Extension => "d";
         protected override string PrintFunctionName => "writeln";
         protected override string Main => "main()";
-        protected override string MethodPrefix => "";
+        protected override string FunctionPrefix => "";
 
         public override IEnumerable<string> GetProgramLines(Program program)
         {
@@ -568,7 +569,7 @@ namespace CompilerBenchmarker
         public override string Extension => "go";
         protected override string PrintFunctionName => "fmt.Println";
         protected override string Main => "main()";
-        protected override string MethodPrefix => "func ";
+        protected override string FunctionPrefix => "func ";
         protected override string EndStatement => "";
 
         protected override string GetStatement(IStatement statement)
@@ -589,14 +590,14 @@ namespace CompilerBenchmarker
         {
             if (fun is MainFunctionDeclaration main)
             {
-                yield return $"{MethodPrefix}{Main} {{";
+                yield return $"{FunctionPrefix}{Main} {{";
                 foreach (var statement in fun.Statements.Where(x => !(x is Return)))
                     yield return $"    {GetStatement(statement)}";
                 yield return "}";
             }
             else
             {
-                yield return $"{MethodPrefix}{fun.FunctionName}({Constants.P} {IntType}) {IntType} {{";
+                yield return $"{FunctionPrefix}{fun.FunctionName}({P} {IntType}) {IntType} {{";
                 foreach (var statement in fun.Statements)
                     yield return $"    {GetStatement(statement)}";
                 yield return "}";
@@ -626,7 +627,7 @@ namespace CompilerBenchmarker
         protected abstract string IntType { get; }
         protected abstract string Main { get; }
         protected abstract string PrintFunctionName { get; }
-        protected abstract string MethodPrefix { get; }
+        protected abstract string FunctionPrefix { get; }
         protected abstract string AssignmentOperator { get; }
         protected abstract string MutableDeclaration { get; }
         protected abstract string ImmutableDeclaration { get; }
@@ -634,6 +635,8 @@ namespace CompilerBenchmarker
         protected virtual string IndentSpaces => "    ";
         protected virtual string FunctionWrapStart => "{";
         protected virtual string FunctionWrapEnd => "}";
+        protected virtual string FunctionType => ":";
+        protected virtual string P => "p";
 
         protected virtual string GetBinaryOperator(BinaryOperator op)
         {
@@ -677,8 +680,8 @@ namespace CompilerBenchmarker
                     var vname = variableDeclaration.Variable.VariableName;
                     var vexpr = GetExpression(variableDeclaration.Initializer);
                     return (assignedTo.Contains(variableDeclaration.Variable))
-                        ? $"{MutableDeclaration} {vname}: {IntType} = {vexpr}"
-                        : $"{ImmutableDeclaration} {vname}: {IntType} = {vexpr}";
+                        ? $"{MutableDeclaration}{vname}: {IntType} = {vexpr}"
+                        : $"{ImmutableDeclaration}{vname}: {IntType} = {vexpr}";
                 case Return ret:
                     return GetExpression(ret.Expr);
                 case Print print:
@@ -697,8 +700,8 @@ namespace CompilerBenchmarker
 
             var isMain = fun is MainFunctionDeclaration;
             yield return isMain
-                ? $"{MethodPrefix} {Main} {FunctionWrapStart}"
-                : $"{MethodPrefix} {fun.FunctionName}({Constants.P}: {IntType}): {IntType} {FunctionWrapStart}";
+                ? $"{FunctionPrefix} {Main} {FunctionWrapStart}"
+                : $"{FunctionPrefix} {fun.FunctionName}({P}: {IntType}){FunctionType} {IntType} {FunctionWrapStart}";
 
             foreach (var statement in fun.Statements)
             {
@@ -719,10 +722,10 @@ namespace CompilerBenchmarker
         protected override string IntType => "Int";
         protected override string Main => "main(): Unit";
         protected override string PrintFunctionName => "println";
-        protected override string MethodPrefix => "def";
+        protected override string FunctionPrefix => "def";
         protected override string AssignmentOperator => "=";
-        protected override string MutableDeclaration => "var";
-        protected override string ImmutableDeclaration => "val";
+        protected override string MutableDeclaration => "var ";
+        protected override string ImmutableDeclaration => "val ";
         protected override bool ML => false;
         protected override string IndentSpaces => "  ";
         protected override string FunctionWrapStart => "= {";
@@ -750,10 +753,10 @@ namespace CompilerBenchmarker
         protected override string IntType => "Int";
         protected override string Main => "main()";
         protected override string PrintFunctionName => "println";
-        protected override string MethodPrefix => "fun";
+        protected override string FunctionPrefix => "fun";
         protected override string AssignmentOperator => "=";
-        protected override string MutableDeclaration => "var";
-        protected override string ImmutableDeclaration => "val";
+        protected override string MutableDeclaration => "var ";
+        protected override string ImmutableDeclaration => "val ";
         protected override bool ML => false;
 
         protected override string GetBinaryOperator(BinaryOperator op)
@@ -800,11 +803,11 @@ namespace CompilerBenchmarker
         protected override string IntType => "int";
         protected override string Main => "main ()";
         protected override string PrintFunctionName => @"Printf.printf ""%i\n""";
-        protected override string MethodPrefix => "let";
+        protected override string FunctionPrefix => "let";
         protected override string AssignmentOperator => "=";
         // choosing to ignore OCaml mutable ref for simplicity
-        protected override string MutableDeclaration => "let";
-        protected override string ImmutableDeclaration => "let";
+        protected override string MutableDeclaration => "let ";
+        protected override string ImmutableDeclaration => "let ";
         protected override bool ML => true;
         protected override string FunctionWrapStart => "=";
         protected override string FunctionWrapEnd => "";
@@ -862,10 +865,10 @@ namespace CompilerBenchmarker
         protected override string IntType => "int";
         protected override string Main => "main args";
         protected override string PrintFunctionName => @"printfn ""%i\n""";
-        protected override string MethodPrefix => "let";
+        protected override string FunctionPrefix => "let";
         protected override string AssignmentOperator => "<-";
         protected override string MutableDeclaration => "let mutable ";
-        protected override string ImmutableDeclaration => "let";
+        protected override string ImmutableDeclaration => "let ";
         protected override bool ML => true;
         protected override string FunctionWrapStart => "=";
         protected override string FunctionWrapEnd => "";
@@ -906,11 +909,11 @@ namespace CompilerBenchmarker
         protected override string IntType => "Int32";
         protected override string Main => "main :: IO ()\nmain ";
         protected override string PrintFunctionName => @"printf ""%i\n""";
-        protected override string MethodPrefix => "";
+        protected override string FunctionPrefix => "";
         protected override string AssignmentOperator => "=";
         // choose to ignore Haskell's Data.IORef for simplicity
-        protected override string MutableDeclaration => "let";
-        protected override string ImmutableDeclaration => "let";
+        protected override string MutableDeclaration => "let ";
+        protected override string ImmutableDeclaration => "let ";
         protected override bool ML => true;
         protected override string FunctionWrapStart => "=";
         protected override string FunctionWrapEnd => "";
@@ -940,7 +943,7 @@ namespace CompilerBenchmarker
                 case VariableDeclaration variableDeclaration:
                     var vname = variableDeclaration.Variable.VariableName;
                     var vexpr = GetExpression(variableDeclaration.Initializer);
-                    return $"{ImmutableDeclaration} ({vname} :: {IntType}) {AssignmentOperator} {vexpr} in";
+                    return $"{ImmutableDeclaration}({vname} :: {IntType}) {AssignmentOperator} {vexpr} in";
                 case Return ret:
                     return GetExpression(ret.Expr);
                 case Print print:
@@ -957,7 +960,7 @@ namespace CompilerBenchmarker
             var isMain = fun is MainFunctionDeclaration;
             yield return isMain
                 ? $"{Main} {FunctionWrapStart}"
-                : $"{fun.FunctionName} :: {IntType} -> {IntType}\n{fun.FunctionName} {Constants.P} {FunctionWrapStart}";
+                : $"{fun.FunctionName} :: {IntType} -> {IntType}\n{fun.FunctionName} {P} {FunctionWrapStart}";
 
             foreach (var statement in fun.Statements)
             {
@@ -1003,10 +1006,11 @@ namespace CompilerBenchmarker
         protected override string IntType => "i32";
         protected override string Main => "main()";
         protected override string PrintFunctionName => @"println!(""{}"", ";
-        protected override string MethodPrefix => "fn";
+        protected override string FunctionPrefix => "fn";
         protected override string AssignmentOperator => "=";
-        protected override string MutableDeclaration => "let mut";
-        protected override string ImmutableDeclaration => "let";
+        protected override string MutableDeclaration => "let mut ";
+        protected override string ImmutableDeclaration => "let ";
+        protected override string FunctionType => " ->";
         protected override bool ML => false;
 
         protected override string GetStatement(
@@ -1018,26 +1022,6 @@ namespace CompilerBenchmarker
                 return GetExpression(ret.Expr);
             else
                 return base.GetStatement(statement, assignedTo) + ";";
-        }
-
-        protected override IEnumerable<string> GetFunctionDeclarationLines(FunctionDeclaration fun)
-        {
-            var assignedTo = new HashSet<Variable>(
-                fun.Statements.OfType<Assignment>().Select(a => a.Variable));
-
-            var isMain = fun is MainFunctionDeclaration;
-            yield return isMain
-                ? $"{MethodPrefix} {Main} {FunctionWrapStart}"
-                : $"{MethodPrefix} {fun.FunctionName}({Constants.P}: {IntType}) -> {IntType} {FunctionWrapStart}";
-
-            foreach (var statement in fun.Statements)
-            {
-                if (isMain && statement is Return)
-                    continue;
-
-                yield return $"{IndentSpaces}{GetStatement(statement, assignedTo)}";
-            }
-            yield return FunctionWrapEnd;
         }
 
         public override IEnumerable<string> GetProgramLines(Program program)
@@ -1056,11 +1040,137 @@ namespace CompilerBenchmarker
         }
     }
 
+    class SwiftLang : BaseExpressionLang
+    {
+        public override string Extension => "swift";
+        protected override string IntType => "Int";
+        protected override string Main => "main()";
+        protected override string PrintFunctionName => @"print";
+        protected override string FunctionPrefix => "func";
+        protected override string AssignmentOperator => "=";
+        protected override string MutableDeclaration => "var ";
+        protected override string ImmutableDeclaration => "let ";
+        protected override string FunctionType => " ->";
+        protected override bool ML => false;
+
+        protected override string GetExpression(IExpr expr)
+        {
+            if (expr is FunctionCall functionCall)
+                return $"{functionCall.FunctionName}({P}: {GetExpression(functionCall.Argument)})";
+            else
+                return base.GetExpression(expr);
+        }
+
+        protected override string GetStatement(
+            IStatement statement, HashSet<Variable> assignedTo)
+        {
+            if (statement is Return ret)
+                return $"return {GetExpression(ret.Expr)}";
+            else
+                return base.GetStatement(statement, assignedTo);
+        }
+
+        public override IEnumerable<string> GetProgramLines(Program program)
+        {
+            foreach (var fun in program.Functions)
+            {
+                foreach (var line in GetFunctionDeclarationLines(fun))
+                    yield return line;
+                yield return "";
+            }
+
+            foreach (var line in GetFunctionDeclarationLines(program.Main))
+                yield return line;
+
+            yield return "";
+            yield return "main()";
+        }
+    }
+
+    class NimLang : BaseExpressionLang
+    {
+        public override string Extension => "nim";
+        protected override string IntType => "int32";
+        protected override string Main => "main()";
+        protected override string PrintFunctionName => @"echo";
+        protected override string FunctionPrefix => "proc";
+        protected override string AssignmentOperator => "=";
+        protected override string MutableDeclaration => "var ";
+        protected override string ImmutableDeclaration => "let ";
+        protected override string FunctionWrapStart => "=";
+        protected override string FunctionWrapEnd => "";
+        protected override bool ML => false;
+
+        protected override string GetBinaryOperator(BinaryOperator op)
+        {
+            switch (op)
+            {
+                case BinaryOperator.BitAnd: return "and";
+                case BinaryOperator.Minus: return "-";
+                case BinaryOperator.Multiply: return "*";
+                case BinaryOperator.BitOr: return "or";
+                case BinaryOperator.Plus: return "+";
+                case BinaryOperator.Xor: return "xor";
+                default: throw new ArgumentOutOfRangeException(nameof(op));
+            }
+        }
+
+        public override IEnumerable<string> GetProgramLines(Program program)
+        {
+            foreach (var fun in program.Functions)
+            {
+                foreach (var line in GetFunctionDeclarationLines(fun))
+                    yield return line;
+                yield return "";
+            }
+
+            foreach (var line in GetFunctionDeclarationLines(program.Main))
+                yield return line;
+
+            yield return "";
+            yield return "main()";
+        }
+    }
+
+    class CrystalLang : BaseExpressionLang
+    {
+        public override string Extension => "cr";
+        protected override string IntType => "Int32";
+        protected override string Main => "main()";
+        protected override string PrintFunctionName => @"puts";
+        protected override string FunctionPrefix => "def";
+        protected override string AssignmentOperator => "=";
+        protected override string MutableDeclaration => "";
+        protected override string ImmutableDeclaration => "";
+        protected override string FunctionWrapStart => "";
+        protected override string FunctionWrapEnd => "end";
+        protected override string FunctionType => " :";
+        protected override string P => "p ";
+        protected override bool ML => false;
+
+        public override IEnumerable<string> GetProgramLines(Program program)
+        {
+            foreach (var fun in program.Functions)
+            {
+                foreach (var line in GetFunctionDeclarationLines(fun))
+                    yield return line;
+                yield return "";
+            }
+
+            foreach (var line in GetFunctionDeclarationLines(program.Main))
+                yield return line;
+
+            yield return "";
+            yield return "main()";
+        }
+    }
+
     #endregion
 
     public class CodeGen
     {
-        // Deterministic program creation (the same program written for call to WriteLang)
+        // Ensure deterministic program creation
+        // So every program made with instance/numFuns follows the same formula
         int _seed => Convert.ToInt32(new Random().NextDouble() * 100000);
 
         ILang GetLang(string lang)
@@ -1079,6 +1189,9 @@ namespace CompilerBenchmarker
                 case "kotlin": return new KotlinLang();
                 case "java": return new JavaLang();
                 case "scala": return new ScalaLang();
+                case "swift": return new SwiftLang();
+                case "nim": return new NimLang();
+                case "crystal": return new CrystalLang();
                 default:
                     throw new ArgumentOutOfRangeException(nameof(lang),
                         $"{lang} is not supported by the code generation. So code it up!");
