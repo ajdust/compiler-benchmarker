@@ -1171,7 +1171,7 @@ namespace CompilerBenchmarker
     {
         // Ensure deterministic program creation
         // So every program made with instance/numFuns follows the same formula
-        int _seed => Convert.ToInt32(new Random().NextDouble() * 100000);
+        int _seed { get; } = Convert.ToInt32(new Random().NextDouble() * 100000);
 
         ILang GetLang(string lang)
         {
