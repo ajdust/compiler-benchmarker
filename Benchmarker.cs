@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 
@@ -136,16 +137,18 @@ namespace CompilerBenchmarker
     class CompilerBenchmark
     {
         public Compiler Compiler;
-        public TimeSpan TimeToCompile;
+        public TimingResult TimeToCompile;
         public bool Compiled;
         public int NumberFunctions;
         public string SecondsToCompile =>
-            Compiled ? TimeToCompile.TotalSeconds.ToString() : "";
+            Compiled ? TimeToCompile.Elapsed.TotalSeconds.ToString() : "";
+        public string MaxMemory =>
+            Compiled ? TimeToCompile.MaxResidentSetSizeKilobytes.ToString() : "";
 
         public static CompilerBenchmark Success(
-            Compiler compiler, TimeSpan timeToCompile, int numberFunctions)
+            Compiler compiler, TimingResult timeToCompile, int numberFunctions)
         {
-            if (timeToCompile == TimeSpan.Zero)
+            if (timeToCompile.Elapsed == TimeSpan.Zero)
                 throw new ArgumentException(
                     "Compiling cannot take zero seconds",
                     nameof(timeToCompile));
@@ -153,10 +156,10 @@ namespace CompilerBenchmarker
         }
 
         public static CompilerBenchmark Failure(Compiler compiler, int numberFunctions)
-            => new CompilerBenchmark(compiler, TimeSpan.Zero, numberFunctions, false);
+            => new CompilerBenchmark(compiler, new TimingResult(TimeSpan.Zero), numberFunctions, false);
 
         private CompilerBenchmark(
-            Compiler compiler, TimeSpan timeToCompile, int numberFunctions, bool compiled)
+            Compiler compiler, TimingResult timeToCompile, int numberFunctions, bool compiled)
         {
             if (numberFunctions < 0)
                 throw new ArgumentException(
@@ -169,36 +172,101 @@ namespace CompilerBenchmarker
         }
     }
 
+    struct TimingResult
+    {
+        public TimeSpan Elapsed;
+        public int MaxResidentSetSizeKilobytes;
+
+        public TimingResult(double elapsedSeconds, int maxResidentSetSizeKilobytes)
+        {
+            Elapsed = TimeSpan.FromSeconds(elapsedSeconds);
+            MaxResidentSetSizeKilobytes = maxResidentSetSizeKilobytes;
+        }
+
+        public TimingResult(TimeSpan elapsed)
+        {
+            Elapsed = elapsed;
+            MaxResidentSetSizeKilobytes = -1;
+        }
+    }
+
     static class Benchmarker
     {
-        static TimeSpan? RunBenchmark(Compiler compiler, string codeFilePath, int numFun)
+        static TimingResult? CmdTimeBenchmark(Compiler compiler, string args)
         {
-            var isDotnet = compiler.Exe == "dotnet";
-            if (isDotnet)
-            {
-                using (var p = Process.Start(compiler.Exe, $"restore CB.{compiler.Extension}proj"))
-                {
-                    p.WaitForExit();
-                    if (p.ExitCode != 0)
-                    {
-                        Console.WriteLine($"  ! Compilation failed for '{compiler.Exe}'");
-                        return null;
-                    }
-                }
-            }
-
-            var watch = new Stopwatch();
-
-            var optArgs = compiler.OptimizeArguments;
-            string args = isDotnet
-                ? $"{compiler.MiscArguments} {optArgs} CB.{compiler.Extension}proj"
-                : $"{compiler.MiscArguments} {optArgs} {codeFilePath}";
-
-            Console.Write($"  - Running with {numFun}: \"{compiler.Exe} {args}\"");
+            var sout = new List<string>();
             using (var p = new Process())
             {
+                // RESULT: %x %e %M means (exit code, elapsed time in seconds, max resident set size)
+                p.StartInfo.FileName = "/usr/bin/time";
+                p.StartInfo.Arguments = $@"-f ""RESULT: %x %e %M"" {compiler.Exe} {args}";
+
+                p.StartInfo.UseShellExecute = false;
+                p.StartInfo.RedirectStandardOutput = true;
+                p.StartInfo.RedirectStandardError = true;
+                p.StartInfo.ErrorDialog = false;
+
+                Console.WriteLine($"\"{p.StartInfo.FileName} {p.StartInfo.Arguments}\"");
+                foreach (string k in compiler.EnvironmentVariables.Keys)
+                {
+                    Console.Write($" and {k}=\"{compiler.EnvironmentVariables[k]}\"");
+                    p.StartInfo.EnvironmentVariables[k] = compiler.EnvironmentVariables[k];
+                }
+
+                // The last line of the output will be from /usr/bin/time
+                p.OutputDataReceived += (sender, outputLine) => {
+                    if (outputLine.Data != null)
+                        sout.Add(outputLine.Data);
+                };
+                p.ErrorDataReceived += (sender, errorLine) => {
+                    if (errorLine.Data != null)
+                        sout.Add(errorLine.Data);
+                };
+
+                Console.WriteLine($"\"{compiler.Exe} {args}\"");
+                p.Start();
+                p.BeginOutputReadLine();
+                p.BeginErrorReadLine();
+                p.WaitForExit();
+
+                if (p.ExitCode != 0)
+                    throw new Exception("Error using /usr/bin/time");
+            }
+
+            for (var i = sout.Count - 1; i >= 0; --i)
+            {
+                var line = sout[i];
+                if (!line.StartsWith("RESULT:"))
+                    continue;
+
+                Console.Write("    ");
+                Console.Write(line);
+                var results = line.Split(' ');
+                var exitCode = results[1];
+                if (int.Parse(exitCode) != 0)
+                {
+                    Console.WriteLine($"  ! Compilation failed for '{compiler.Exe} {args}'");
+                    Thread.Sleep(2500);
+                    return null;
+                }
+
+                var elapsedSeconds = double.Parse(results[2]);
+                var maxResidentSetSize = int.Parse(results[3]);
+                return new TimingResult(elapsedSeconds, maxResidentSetSize);
+            }
+
+            throw new Exception("Result of /usr/bin/time not found in output of {" + string.Join("\n", sout) + "}");
+        }
+
+        static TimingResult? StopwatchBenchmark(Compiler compiler, string args)
+        {
+            using (var p = new Process())
+            {
+                var watch = new Stopwatch();
                 p.StartInfo.FileName = compiler.Exe;
                 p.StartInfo.Arguments = args;
+
+                Console.WriteLine($"\"{p.StartInfo.FileName} {p.StartInfo.Arguments}\"");
                 foreach (string k in compiler.EnvironmentVariables.Keys)
                 {
                     Console.Write($" and {k}=\"{compiler.EnvironmentVariables[k]}\"");
@@ -216,11 +284,39 @@ namespace CompilerBenchmarker
                     Thread.Sleep(2500);
                     return null;
                 }
+
+                Console.WriteLine($"  - Took {watch.Elapsed}");
+                Console.WriteLine();
+                return new TimingResult(watch.Elapsed);
+            }
+        }
+
+        static TimingResult? RunBenchmark(Compiler compiler, string codeFilePath, int numFun)
+        {
+            var isDotnet = compiler.Exe == "dotnet";
+            if (isDotnet)
+            {
+                using (var p = Process.Start(compiler.Exe, $"restore CB.{compiler.Extension}proj"))
+                {
+                    p.WaitForExit();
+                    if (p.ExitCode != 0)
+                    {
+                        Console.WriteLine($"  ! Compilation failed for '{compiler.Exe}'");
+                        return null;
+                    }
+                }
             }
 
-            Console.WriteLine($"  - Took {watch.Elapsed}");
-            Console.WriteLine();
-            return watch.Elapsed;
+            var optArgs = compiler.OptimizeArguments;
+            string args = isDotnet
+                ? $"{compiler.MiscArguments} {optArgs} CB.{compiler.Extension}proj"
+                : $"{compiler.MiscArguments} {optArgs} {codeFilePath}";
+
+            Console.Write($"  - Running with {numFun}: ");
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                return CmdTimeBenchmark(compiler, args);
+            else
+                return StopwatchBenchmark(compiler, args);
         }
 
         static IEnumerable<CompilerBenchmark> RunBenchmarks(
@@ -381,10 +477,10 @@ namespace CompilerBenchmarker
                 new Compiler("FSharp",   "fs",   "dotnet", "--version", "-c release",
                     miscArguments: "build --no-restore"),
 
-                new Compiler("Nim",     "nim",      "nim", "--version", "compile"),
-                new Compiler("Nim",     "nim",      "nim", "--version", "compile -d:release --opt:speed"),
-                new Compiler("Crystal",  "cr",  "crystal", "--version", "build"),
-                new Compiler("Crystal",  "cr",  "crystal", "--version", "build --release"),
+                // new Compiler("Nim",     "nim",      "nim", "--version", "compile"),
+                // new Compiler("Nim",     "nim",      "nim", "--version", "compile -d:release --opt:speed"),
+                // new Compiler("Crystal",  "cr",  "crystal", "--version", "build"),
+                // new Compiler("Crystal",  "cr",  "crystal", "--version", "build --release"),
             };
 
             foreach (var c in compilers.GroupBy(x => x.Exe).Select(x => x.First()))
@@ -427,7 +523,7 @@ namespace CompilerBenchmarker
             using (var ongoing = File.AppendText(ongoingResultsFileName))
             {
                 // Write header for ongoing results
-                ongoing.WriteLine($"Compiler, Number Functions, Time");
+                ongoing.WriteLine($"Compiler, Number Functions, Time (seconds), Memory (KB)");
 
                 // Run
                 var lazyBenchmarks = RunBenchmarks(
@@ -436,7 +532,7 @@ namespace CompilerBenchmarker
                 {
                     benchmarks.Add(b);
                     ongoing.WriteLine(
-                        $"{b.Compiler.ToString()}, {b.NumberFunctions}, {b.SecondsToCompile}");
+                        $"{b.Compiler.ToString()}, {b.NumberFunctions}, {b.SecondsToCompile}, {b.MaxMemory}");
                 }
             }
 

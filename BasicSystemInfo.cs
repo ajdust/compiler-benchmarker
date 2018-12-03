@@ -8,7 +8,7 @@ namespace CompilerBenchmarker
 {
     class BasicSystemInfo
     {
-        private static string waitAndRead(string exe, string args)
+        private static string WaitAndRead(string exe, string args)
         {
             using (var p = new Process())
             {
@@ -74,9 +74,9 @@ namespace CompilerBenchmarker
             }
 
             var sep = "\n-----------------------------\n";
-            var vers = $"\n{sep}{versCmd} {versCmdArg}{sep}" + waitAndRead(versCmd, versCmdArg);
-            var cpu = $"\n{sep}{cpuCmd} {cpuCmdArg}{sep}" + waitAndRead(cpuCmd, cpuCmdArg);
-            var mem = $"\n{sep}{memCmd} {memCmdArg}{sep}" + waitAndRead(memCmd, memCmdArg);
+            var vers = $"\n{sep}{versCmd} {versCmdArg}{sep}" + WaitAndRead(versCmd, versCmdArg);
+            var cpu = $"\n{sep}{cpuCmd} {cpuCmdArg}{sep}" + WaitAndRead(cpuCmd, cpuCmdArg);
+            var mem = $"\n{sep}{memCmd} {memCmdArg}{sep}" + WaitAndRead(memCmd, memCmdArg);
             return new BasicSystemInfo
             {
                 OS = vers,
