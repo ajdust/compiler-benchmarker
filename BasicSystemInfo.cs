@@ -21,8 +21,19 @@ namespace CompilerBenchmarker
                 p.StartInfo.RedirectStandardOutput = true;
                 p.StartInfo.RedirectStandardError = true;
                 p.StartInfo.ErrorDialog = false;
-                p.OutputDataReceived += (sender, outputLine) => { if (outputLine.Data != null) sout.Append(outputLine.Data + "\n"); };
-                p.ErrorDataReceived += (sender, errorLine) => { if (errorLine.Data != null) serr.Append(errorLine.Data + "\n"); };
+
+                p.OutputDataReceived += (sender, outputLine) =>
+                {
+                    if (outputLine.Data != null)
+                        sout.Append(outputLine.Data + "\n");
+                };
+
+                p.ErrorDataReceived += (sender, errorLine) =>
+                {
+                    if (errorLine.Data != null)
+                        serr.Append(errorLine.Data + "\n");
+                };
+
                 p.Start();
                 p.BeginOutputReadLine();
                 p.BeginErrorReadLine();
