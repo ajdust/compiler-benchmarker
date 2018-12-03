@@ -82,7 +82,7 @@ namespace CompilerBenchmarker
 
             yield return (fun is MainFunctionDeclaration)
                 ? $"{FunctionPrefix}{IntType} {Main} {{"
-                : $"{FunctionPrefix}{ConstIntType} {fun.FunctionName}({IntType} {P}) {{";
+                : $"{FunctionPrefix}{IntType} {fun.FunctionName}({ConstIntType} {P}) {{";
 
             foreach (var statement in fun.Statements)
                 yield return $"    {GetStatement(statement, assignedTo)}";
@@ -151,7 +151,7 @@ namespace CompilerBenchmarker
     class CLang : BaseImperativeLang
     {
         public override string Extension => "c";
-        protected override string PrintFunctionFormat => @"printf(""%i"", $V)";
+        protected override string PrintFunctionFormat => @"printf(""%i\n"", $V)";
         protected override string Main => "main(void)";
         protected override string FunctionPrefix => "";
         protected override string ConstIntType => $"const {IntType}";
@@ -168,7 +168,7 @@ namespace CompilerBenchmarker
     class CppLang : BaseImperativeLang
     {
         public override string Extension => "cpp";
-        protected override string PrintFunctionFormat => "std::cout << $V";
+        protected override string PrintFunctionFormat => "std::cout << $V << std::endl";
         protected override string Main => "main()";
         protected override string FunctionPrefix => "";
         protected override string ConstIntType => $"const {IntType}";

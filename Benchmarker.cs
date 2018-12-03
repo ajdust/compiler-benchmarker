@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -59,14 +58,14 @@ namespace CompilerBenchmarker
         public string MiscArguments;
         public string Version;
         public string VersionTrimmed;
-        public StringDictionary EnvironmentVariables;
+        public Dictionary<string,string> EnvironmentVariables;
 
         public Compiler(
             string language, string extension, string exe,
             string versionArgument,
             string optimizeArguments = null,
             string miscArguments = null,
-            StringDictionary envVars = null)
+            Dictionary<string,string> envVars = null)
         {
             if (string.IsNullOrWhiteSpace(language))
                 throw new ArgumentNullException(nameof(language));
@@ -84,7 +83,7 @@ namespace CompilerBenchmarker
             VersionArgument = versionArgument;
             OptimizeArguments = optimizeArguments;
             MiscArguments = miscArguments;
-            EnvironmentVariables = envVars ?? new StringDictionary();
+            EnvironmentVariables = envVars ?? new Dictionary<string,string>();
             try
             {
                 CheckCompilerAndSetVersion();
@@ -195,13 +194,17 @@ namespace CompilerBenchmarker
                 ? $"{compiler.MiscArguments} {optArgs} CB.{compiler.Extension}proj"
                 : $"{compiler.MiscArguments} {optArgs} {codeFilePath}";
 
-            Console.WriteLine($"  - Running with {numFun}: {compiler.Exe} {args}");
+            Console.Write($"  - Running with {numFun}: \"{compiler.Exe} {args}\"");
             using (var p = new Process())
             {
                 p.StartInfo.FileName = compiler.Exe;
                 p.StartInfo.Arguments = args;
                 foreach (string k in compiler.EnvironmentVariables.Keys)
+                {
+                    Console.Write($" and {k}=\"{compiler.EnvironmentVariables[k]}\"");
                     p.StartInfo.EnvironmentVariables[k] = compiler.EnvironmentVariables[k];
+                }
+                Console.WriteLine();
 
                 watch.Start();
                 p.Start();
@@ -336,49 +339,52 @@ namespace CompilerBenchmarker
         {
             var compilers = new List<Compiler>
             {
+                new Compiler("C",         "c",      "gcc", "--version"),        // default
+                new Compiler("C",         "c",      "gcc", "--version", "-O2"), // optimized
+                new Compiler("C",         "c",    "clang", "--version"),
+                new Compiler("C",         "c",    "clang", "--version", "-O2"),
+                new Compiler("C++",     "cpp",      "g++", "--version"),
+                new Compiler("C++",     "cpp",      "g++", "--version", "-O2"),
+                new Compiler("C++",     "cpp",  "clang++", "--version"),
                 new Compiler("C++",     "cpp",  "clang++", "--version", "-O2"),
-                new Compiler("Rust",     "rs",    "rustc", "--version", "-C opt-level=2"),
+                new Compiler("D",         "d",      "dmd", "--version"),
+                new Compiler("D",         "d",      "dmd", "--version", "-O"),
+                new Compiler("D",         "d",     "ldc2", "--version"),
+                new Compiler("D",         "d",     "ldc2", "--version", "-O"),
+                new Compiler("Go",       "go",       "go",   "version", "build"),
                 new Compiler("Rust",     "rs",    "rustc", "--version"),
+                // new Compiler("Rust",     "rs",    "rustc", "--version", "-C opt-level=2"),
+                new Compiler("Swift", "swift",   "swiftc", "--version"),
+                new Compiler("Swift", "swift",   "swiftc", "--version", "-O"),
+                new Compiler("OCaml",    "ml", "ocamlopt", "--version"),
+                new Compiler("OCaml",    "ml", "ocamlopt", "--version", "-O2"),
+                new Compiler("Haskell",  "hs",    "stack", "--version", miscArguments: "ghc --"),
                 new Compiler("Haskell",  "hs",    "stack", "--version", "-O2", miscArguments: "ghc --"),
-                new Compiler("Haskell",  "hs",    "stack", "--version", miscArguments: "ghc"),
-                new Compiler("Scala", "scala",   "scalac", "-version", "-opt:l:inline -opt-inline-from:**",
-                    envVars: new StringDictionary { ["JAVA_OPTS"] = "-Xms4096M -Xms64M" }),
+
+                new Compiler("Java",   "java",    "javac", "-version",
+                    miscArguments: "-J-Xmx4096M -J-Xms64M"),
                 new Compiler("Scala", "scala",   "scalac", "-version",
-                    envVars: new StringDictionary { ["JAVA_OPTS"] = "-Xms4096M -Xms64M" }),
+                    envVars: new Dictionary<string,string> { ["JAVA_OPTS"] = "-Xmx4096M -Xms64M" }),
                 new Compiler("Scala", "scala",     "dotc", "-version",
-                    envVars: new StringDictionary { ["JAVA_OPTS"] = "-Xms4096M -Xms64M" }),
+                    envVars: new Dictionary<string,string> { ["JAVA_OPTS"] = "-Xmx4096M -Xms64M" }),
+                new Compiler("Scala", "scala",   "scalac", "-version", "-opt:l:inline -opt-inline-from:**",
+                    envVars: new Dictionary<string,string> { ["JAVA_OPTS"] = "-Xmx4096M -Xms64M" }),
                 new Compiler("Kotlin",   "kt",  "kotlinc", "-version",
-                    envVars: new StringDictionary { ["JAVA_OPTS"] = "-Xms4096M -Xms64M" }),
-                new Compiler("FSharp",   "fs",   "dotnet", "--version", "-c release",
+                    envVars: new Dictionary<string,string> { ["JAVA_OPTS"] = "-Xmx4096M -Xms64M" }),
+
+                new Compiler("CSharp",   "cs",   "dotnet", "--version",
+                    miscArguments: "build --no-restore"),
+                new Compiler("CSharp",   "cs",   "dotnet", "--version", "-c release",
                     miscArguments: "build --no-restore"),
                 new Compiler("FSharp",   "fs",   "dotnet", "--version",
                     miscArguments: "build --no-restore"),
-                new Compiler("OCaml",    "ml", "ocamlopt", "--version", "-O2"),
-                new Compiler("OCaml",    "ml", "ocamlopt", "--version"),
-                new Compiler("Swift", "swift",   "swiftc", "--version", "-O"),
-                new Compiler("Swift", "swift",   "swiftc", "--version"),
-                new Compiler("Nim",     "nim",      "nim", "--version", "compile -d:release --opt:speed"),
+                new Compiler("FSharp",   "fs",   "dotnet", "--version", "-c release",
+                    miscArguments: "build --no-restore"),
+
                 new Compiler("Nim",     "nim",      "nim", "--version", "compile"),
-                new Compiler("Crystal",  "cr",  "crystal", "--version", "build --release"),
+                new Compiler("Nim",     "nim",      "nim", "--version", "compile -d:release --opt:speed"),
                 new Compiler("Crystal",  "cr",  "crystal", "--version", "build"),
-                new Compiler("CSharp",   "cs",   "dotnet", "--version", "-c release",
-                    miscArguments: "build --no-restore"),
-                new Compiler("CSharp",   "cs",   "dotnet", "--version",
-                    miscArguments: "build --no-restore"),
-                new Compiler("Java",   "java",    "javac", "-version",
-                    miscArguments: "-J-Xmx4096M -J-Xms64M"),
-                new Compiler("Go",       "go",       "go",   "version", "build"),
-                new Compiler("C",         "c",      "gcc", "--version", "-O2"), // optimized
-                new Compiler("C",         "c",      "gcc", "--version"),        // default
-                new Compiler("C",         "c",    "clang", "--version", "-O2"),
-                new Compiler("C",         "c",    "clang", "--version"),
-                new Compiler("C++",     "cpp",      "g++", "--version", "-O2"),
-                new Compiler("C++",     "cpp",      "g++", "--version"),
-                new Compiler("C++",     "cpp",  "clang++", "--version"),
-                new Compiler("D",         "d",      "dmd", "--version", "-O"),
-                new Compiler("D",         "d",      "dmd", "--version"),
-                new Compiler("D",         "d",     "ldc2", "--version", "-O"),
-                new Compiler("D",         "d",     "ldc2", "--version"),
+                new Compiler("Crystal",  "cr",  "crystal", "--version", "build --release"),
             };
 
             foreach (var c in compilers.GroupBy(x => x.Exe).Select(x => x.First()))
@@ -408,7 +414,7 @@ namespace CompilerBenchmarker
             }
 
             // Delete any existing results (not an issue if this date format is used, but if not)
-            var baseFileName = $"results_{DateTime.Now.ToString("yyyyMMddTHH")}";
+            var baseFileName = $"results_{DateTime.Now.ToString("yyyy-MM-dd HHmm")}";
             var ongoingResultsFileName = $"{baseFileName}_ongoing.csv";
             var finalResultFileName = $"{baseFileName}_final.csv";
             if (File.Exists(ongoingResultsFileName))
@@ -442,8 +448,8 @@ namespace CompilerBenchmarker
             // int numberAtStart = 5;
             // int numberOfSteps = 1;
             // int stepIncreaseNumber = 0;
-            int numberAtStart = 5;
-            int numberOfSteps = 1;
+            int numberAtStart = 5000;
+            int numberOfSteps = 5;
             int stepIncreaseNumber = 5000;
 
             try
