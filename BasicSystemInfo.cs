@@ -12,39 +12,17 @@ namespace CompilerBenchmarker
         {
             using (var p = new Process())
             {
-                var sout = new StringBuilder();
-                var serr = new StringBuilder();
-
                 p.StartInfo.FileName = exe;
                 p.StartInfo.Arguments = args;
                 p.StartInfo.UseShellExecute = false;
                 p.StartInfo.RedirectStandardOutput = true;
                 p.StartInfo.RedirectStandardError = true;
-                p.StartInfo.ErrorDialog = false;
-
-                p.OutputDataReceived += (sender, outputLine) =>
-                {
-                    if (outputLine.Data != null)
-                        sout.Append(outputLine.Data + "\n");
-                };
-
-                p.ErrorDataReceived += (sender, errorLine) =>
-                {
-                    if (errorLine.Data != null)
-                        serr.Append(errorLine.Data + "\n");
-                };
-
                 p.Start();
-                p.BeginOutputReadLine();
-                p.BeginErrorReadLine();
 
-                if (!p.WaitForExit(10000))
-                {
-                    p.Kill();
-                    return "Timed out after 10 seconds";
-                }
-
-                return p.ExitCode == 0 ? sout.ToString() : serr.ToString();
+                var sout = p.StandardOutput.ReadToEnd();
+                return string.IsNullOrWhiteSpace(sout)
+                    ? $"No standard output found for `{exe} {args}`"
+                    : sout;
             }
         }
 
