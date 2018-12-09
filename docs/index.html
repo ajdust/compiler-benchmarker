@@ -133,8 +133,9 @@ $(function(event) {
       var fillColor = color;
       if (
         seriesName.indexOf('/o') >= 0 ||
-        seriesName.indexOf('-optim') >= 0 ||
+        seriesName.indexOf('-opt') >= 0 ||
         seriesName.indexOf('-O') >= 0 ||
+        seriesName.indexOf('-c') >= 0 ||
         seriesName.indexOf('-C') >= 0) {
         fillColor = "white";
       }
@@ -187,33 +188,33 @@ $(function(event) {
     colors: [
       langColor['C'], // C (gcc)
       langColor['C'], // C (gcc -O2)
-      langColor['C++'], // C++ (g++ -O2)
+      langColor['C'], // C (clang)
+      langColor['C'], // C (clang -O2)
       langColor['C++'], // C++ (g++)
-      langColor['C++'], // C++ (clang -O2)
+      langColor['C++'], // C++ (g++ -O2)
       langColor['C++'], // C++ (clang)
-      langColor['Rust'], // Rust (rustc -C opt-level=2)
-      langColor['Rust'], // Rust (rustc)
-      langColor['D'], // D (dmd -O)
+      langColor['C++'], // C++ (clang -O2)
       langColor['D'], // D (dmd)
-      langColor['D'], // D (gdc -O)
-      langColor['D'], // D (gdc)
-      langColor['D'], // D (ldc2 -O)
+      langColor['D'], // D (dmd -O)
       langColor['D'], // D (ldc2)
-      langColor['OCaml'], // OCaml (ocamlopt -O2)
-      langColor['OCaml'], // OCaml (ocamlopt)
-      langColor['Haskell'], // Haskell (ghc -O)
-      langColor['Haskell'], // Haskell (ghc)
+      langColor['D'], // D (ldc2 -O)
       langColor['Go'], // Go (go build)
-      langColor['CSharp'], // CSharp (csc /o)
-      langColor['CSharp'], // CSharp (csc)
-      langColor['FSharp'], // FSharp (fsharpc -O)
-      langColor['FSharp'], // FSharp (fsharpc)
+      langColor['Rust'], // Rust (rustc)
+      langColor['Swift'], // Swift (swiftc)
+      langColor['Swift'], // Swift (swiftc -O)
+      langColor['OCaml'], // OCaml (ocamlopt)
+      langColor['OCaml'], // OCaml (ocamlopt -O2)
+      langColor['Haskell'], // Haskell (ghc)
+      langColor['Haskell'], // Haskell (ghc -O)
       langColor['Java'], // Java (javac)
-      langColor['Scala'], // Scala (scalac -optimise)
       langColor['Scala'], // Scala (scalac)
-      langColor['Scala'], // Scala (dotc -optimise)
       langColor['Scala'], // Scala (dotc)
+      langColor['Scala'], // Scala (scalac -opt..)
       langColor['Kotlin'], // Kotlin (kotlinc)
+      langColor['CSharp'], // CSharp (dotnet)
+      langColor['CSharp'], // CSharp (dotnet -c ..)
+      langColor['FSharp'], // FSharp (dotnet)
+      langColor['FSharp'], // FSharp (dotnet -c ..)
     ],
     drawPointCallback: pointCallback,
     drawHighlightPointCallback: pointCallback
@@ -225,7 +226,7 @@ $(function(event) {
     var native = ['C ', 'C++', 'Rust', 'D ', 'OCaml', 'Haskell', 'Go'];
     var vm = ['Java', 'CSharp', 'FSharp', 'Scala', 'Kotlin'];
     var functional = [ 'FSharp', 'Haskell', 'OCaml'];
-    var optflags = ['-C', '-o', '-O', '/o']
+    var optflags = ['-C', '-o', '-O', '/o', '-c']
     var showhide = {};
     for (var i = 1; i < labels.length; i++) {
       showhide[i] = true;
