@@ -33,7 +33,7 @@ This function has a nearly identical version in almost every language. You can s
 - Rust (rustc)
 - Swift (swiftc)
 - OCaml (ocamlopt)
-- Haskell (stack)
+- Haskell (ghc)
 - Java (javac)
 - Scala
   - scalac
@@ -86,15 +86,15 @@ An interactive graph of the results can be seen [here](https://johnsabr.github.i
 | FSharp (dotnet)       | 14.1 | 26.4 | 38.8 | 50.5 | 64.2  |
 | OCaml (ocamlopt)      | 5.2  | 13.5 | 26.3 | 50.6 |       |
 | FSharp (dotnet -c ..) | 16.7 | 31.3 | 45.9 | 62.3 | 77.4  |
-| Haskell (stack)       | 12.7 | 27.4 | 54.2 | 75.6 | 117.0 |
-| Haskell (stack -O2)   | 12.6 | 27.0 | 57.3 | 75.8 | 122.4 |
+| Haskell (ghc)       | 12.7 | 27.4 | 54.2 | 75.6 | 117.0 |
+| Haskell (ghc -O2)   | 12.6 | 27.0 | 57.3 | 75.8 | 122.4 |
 | Swift (swiftc)        | 11.6 | 31.4 | 54.7 | 77.3 | 106.6 |
 | Kotlin (kotlinc)      | 34.9 | 68.6 | 101.5 | 135.9 |     |
 | Swift (swiftc -O)     | 13.8 | 40.0 | 72.8  |       |     |
 | Scala (scalac)        | 8.9  | 12.4 |       |       |     |
 | Scala (scalac -opt..) | 11.0 | 18.0 |       |       |     |
 
-Memory usage from `/usr/bin/time -v` for 20000 functions. Not the best indicator of memory usage, note.
+Memory usage from `/usr/bin/time -v` for compiling 20000 functions. Not the best indicator of memory usage, note.
 
 | Compiler  | Memory (MB) |
 | ---       | ---: |
@@ -122,17 +122,16 @@ Memory usage from `/usr/bin/time -v` for 20000 functions. Not the best indicator
 | OCaml (ocamlopt)      | 1539 |
 | Rust (rustc)          | 2171 |
 | Kotlin (kotlinc)      | 4348 |
-| Haskell (stack -O2)   | 4433 |
-| Haskell (stack)       | 4809 |
+| Haskell (ghc -O2)   | 4433 |
+| Haskell (ghc)       | 4809 |
 
 A few notes/opinions might be made from these results. First, some compilers error out with too many functions. Java, Scala, Kotlin, Rust, OCaml, and optimised Swift error in one way or another. Compiling optimised Rust does not work with these random functions generated for some reason.
 
-These results aren't too surpising - though I would expect Kotlin to cold compile faster. The imperative languages and Go - D, Java, Go, C/C++, C# - compile very fast and use relatively little memory. More functional languages with more complicated type systems - Swift, Rust, FSharp, Haskell, OCaml - compile slower and use relatively more memory. D is the fastest to compile by far among imperative langauges, OCaml is the leanest by a little bit for functional languages. Most of the time, optimization flags definitely increase the build time, CSharp and OCaml don't appear to have much to optimise here. Haskell and Kotlin both take particularly long time with much memory.
+These results aren't too surpising - though I would expect Kotlin to cold compile faster. The imperative languages - D, Java, Go, C/C++, C# - compile very fast and use relatively little memory doing so. More functional languages with more complicated type systems - Swift, Rust, FSharp, Haskell, OCaml - compile slower and use relatively more memory. D is the fastest to compile by far among imperative languages, OCaml is the leanest by a little bit for functional languages. Most of the time, optimization flags definitely increase the build time, though CSharp and OCaml don't appear to have much to optimise here. Haskell and Kotlin both take particularly long time to compile and use much memory doing so.
 
 If this contest had winners, it would be:
 
-Gold Metal: `dmd` representing D
-Silver Metal: `clang` representing C/C++
-Bronze Metal: `go` representing Go
-
-Runner ups: `javac`, `dotnet`
+- Gold Metal: `dmd` representing D
+- Silver Metal: `clang` representing C/C++
+- Bronze Metal: `go` representing Go
+- Runner ups: `javac`, `dotnet`
