@@ -223,9 +223,9 @@ $(function(event) {
   graph.ready(function() {
 
     var labels = graph.getLabels();
-    var native = ['C ', 'C++', 'Rust', 'D ', 'OCaml', 'Haskell', 'Go'];
+    var native = ['C ', 'C++', 'Rust', 'D ', 'OCaml', 'Haskell', 'Go', 'Swift'];
     var vm = ['Java', 'CSharp', 'FSharp', 'Scala', 'Kotlin'];
-    var functional = [ 'FSharp', 'Haskell', 'OCaml'];
+    var functional = ['FSharp', 'Haskell', 'OCaml'];
     var optflags = ['-C', '-o', '-O', '/o', '-c']
     var showhide = {};
     for (var i = 1; i < labels.length; i++) {
