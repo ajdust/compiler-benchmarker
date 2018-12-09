@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 namespace CompilerBenchmarker
 {
-	#region Data
+    #region Data
 
     interface IExpr {}
 
