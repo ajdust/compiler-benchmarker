@@ -19,7 +19,7 @@ int f7(const int p) {
 }
 ```
 
-This function has a nearly identical version in almost every language. You can see results for how compilers handle from 5000 to 25000 of these randomized functions [here](https://johnsabr.github.io/compiler-benchmarker/). Languages and compilers tested (all on Ubuntu 18 with kernel 4.15.0-39-generic):
+This function has a nearly identical version in almost every language. You can see results for how compilers handle from 5000 to 25000 of these randomized functions [here](https://ajdust.github.io/compiler-benchmarker/). Languages and compilers tested (all on Ubuntu 18 with kernel 4.15.0-39-generic):
 
 - C/C++
   - gcc
