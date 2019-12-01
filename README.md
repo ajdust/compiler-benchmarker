@@ -60,7 +60,7 @@ Currently:
 
 ## Results discussion
 
-An interactive graph of the results can be seen [here](https://johnsabr.github.io/compiler-benchmarker/). Below is a table of results (with seconds to compile) from a run on 2018-12-02, as sorted ascending on the 20000 column. System information is included in the results directory, and the results CSV includes the version of the compiler used. VM runtimes installed: `openjdk 10.0.2 2018-07-17` and `Microsoft.NETCore.App 2.1.5`.
+An interactive graph of the results can be seen [here](https://ajdust.github.io/compiler-benchmarker/). Below is a table of results (with seconds to compile) from a run on 2018-12-02, as sorted ascending on the 20000 column. System information is included in the results directory, and the results CSV includes the version of the compiler used. VM runtimes installed: `openjdk 10.0.2 2018-07-17` and `Microsoft.NETCore.App 2.1.5`.
 
 | Functions | 5000 | 10000 | 15000 | 20000 | 25000 |
 | ---       | ---: | ---:  | ---:  | ---:  | ---: |
