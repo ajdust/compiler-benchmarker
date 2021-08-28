@@ -381,11 +381,11 @@ namespace CompilerBenchmarker
 
         static string GetCsProj() =>
             @"<Project Sdk=""Microsoft.NET.Sdk""><PropertyGroup><OutputType>Exe</OutputType>" +
-            @"<TargetFramework>netcoreapp2.1</TargetFramework></PropertyGroup></Project>";
+            @"<TargetFramework>netcoreapp5.0</TargetFramework></PropertyGroup></Project>";
 
         static string GetFsProj(string file) =>
             @"<Project Sdk=""Microsoft.NET.Sdk""><PropertyGroup><OutputType>Exe</OutputType>" +
-            @"<TargetFramework>netcoreapp2.1</TargetFramework></PropertyGroup>" +
+            @"<TargetFramework>netcoreapp5.0</TargetFramework></PropertyGroup>" +
             @"<ItemGroup><Compile Include=""$FILE"" /></ItemGroup></Project>"
             .Replace("$FILE", file);
     }
