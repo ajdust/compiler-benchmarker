@@ -31,7 +31,8 @@ namespace CompilerBenchmarker
             string versCmd = "", versCmdArg = "", cpuCmd = "", cpuCmdArg = "", memCmd = "", memCmdArg = "";
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                versCmd = "ver";
+                versCmd = "wmic";
+                versCmdArg = "os get Caption";
                 cpuCmd = "wmic";
                 cpuCmdArg = "cpu";
                 memCmd = "wmic";
