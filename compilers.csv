@@ -1,0 +1,20 @@
+Language,Extension,Compiler,VersionArgument
+C,c,gcc,--version
+C,c,clang,--version
+C++,cpp,g++,--version
+C++,cpp,clang++,--version
+D,d,dmd,--version
+D,d,gdc,--version
+D,d,ldc2,--version
+Go,go,go,version
+Rust,rs,rustc,--version
+Swift,swift,swiftc,--version
+OCaml,ml,ocamlopt,--version
+Haskell,hs,stack,ghc -- --version
+Java,java,javac,-version
+Scala,scala,scalac,-version
+Kotlin,kt,kotlinc,-version
+CSharp,cs,dotnet,--version
+FSharp,fs,dotnet,--version
+Nim,nim,nim,--version
+Crystal,cr,crystal,--version

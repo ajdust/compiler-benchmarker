@@ -1,9 +1,8 @@
 using System;
 using System.Linq;
 using System.Collections.Generic;
-using System.IO;
 
-namespace CompilerBenchmarker
+namespace CompilerBenchmarker.CodeGen
 {
     interface ILang
     {
@@ -11,7 +10,10 @@ namespace CompilerBenchmarker
         IEnumerable<string> GetProgramLines(Program program);
     }
 
-    abstract class BaseImperativeLang : ILang
+    /// <summary>
+    /// Base C-style language with statements and semicolons to end lines.
+    /// </summary>
+    abstract class BaseCStyleLang : ILang
     {
         public abstract string Extension { get; }
         protected abstract string Main { get; }
@@ -22,58 +24,42 @@ namespace CompilerBenchmarker
         protected const string IndentSpaces = "    ";
         protected const string P = "p"; // function parameter name
 
-        protected virtual string GetBinaryOperator(BinaryOperator op)
-        {
-            switch (op)
+        protected virtual string GetBinaryOperator(BinaryOperator op) =>
+            op switch
             {
-                case BinaryOperator.BitAnd: return "&";
-                case BinaryOperator.Minus: return "-";
-                case BinaryOperator.Multiply: return "*";
-                case BinaryOperator.BitOr: return "|";
-                case BinaryOperator.Plus: return "+";
-                case BinaryOperator.Xor: return "^";
-                default: throw new ArgumentOutOfRangeException(nameof(op));
-            }
-        }
+                BinaryOperator.BitAnd => "&",
+                BinaryOperator.Minus => "-",
+                BinaryOperator.Multiply => "*",
+                BinaryOperator.BitOr => "|",
+                BinaryOperator.Plus => "+",
+                BinaryOperator.Xor => "^",
+                _ => throw new ArgumentOutOfRangeException(nameof(op))
+            };
 
-        protected virtual string GetExpression(IExpr expr)
-        {
-            switch (expr)
+        protected virtual string GetExpression(IExpr expr) =>
+            expr switch
             {
-                case Literal literal: return literal.Text;
-                case Variable variable: return variable.VariableName;
-                case FunctionCall functionCall:
-                    return $"{functionCall.FunctionName}({GetExpression(functionCall.Argument)})";
-                case BinaryOperation binOp:
-                    var left = GetExpression(binOp.LeftOperand);
-                    var right = GetExpression(binOp.RightOperand);
-                    return $"({left} {GetBinaryOperator(binOp.Operator)} {right})";
-                default: throw new ArgumentOutOfRangeException(nameof(expr));
-            }
-        }
+                Literal literal => literal.Text,
+                Variable variable => variable.VariableName,
+                FunctionCall functionCall =>
+                    $"{functionCall.FunctionName}({GetExpression(functionCall.Argument)})",
+                BinaryOperation binOp =>
+                    $"({GetExpression((binOp.LeftOperand))} {GetBinaryOperator(binOp.Operator)} {GetExpression((binOp.RightOperand))})",
+                _ => throw new ArgumentOutOfRangeException(nameof(expr))
+            };
 
-        protected virtual string GetStatement(IStatement statement, HashSet<Variable> assignedTo)
-        {
-            switch (statement)
+        protected virtual string GetStatement(IStatement statement, HashSet<Variable> assignedTo) =>
+            statement switch
             {
-                case Assignment assignment:
-                    var aname = assignment.Variable.VariableName;
-                    var aexpr = GetExpression(assignment.AssignedExpression);
-                    return $"{aname} = {aexpr};";
-                case VariableDeclaration variableDeclaration:
-                    var vname = variableDeclaration.Variable.VariableName;
-                    var vexpr = GetExpression(variableDeclaration.Initializer);
-                    return assignedTo.Contains(variableDeclaration.Variable)
-                        ? $"{IntType} {vname} = {vexpr};"
-                        : $"{ConstIntType} {vname} = {vexpr};";
-                case Return ret:
-                    return $"return {GetExpression(ret.Expr)};";
-                case Print print:
-                    var pvname = print.Variable.VariableName;
-                        return $"{PrintFunctionFormat.Replace("$V", pvname)};";
-                default: throw new ArgumentOutOfRangeException(nameof(statement));
-            }
-        }
+                Assignment assignment =>
+                    $"{assignment.Variable.VariableName} = {GetExpression(assignment.AssignedExpression)};",
+                VariableDeclaration variableDeclaration => assignedTo.Contains(variableDeclaration.Variable)
+                    ? $"{IntType} {variableDeclaration.Variable.VariableName} = {GetExpression(variableDeclaration.Initializer)};"
+                    : $"{ConstIntType} {variableDeclaration.Variable.VariableName} = {GetExpression(variableDeclaration.Initializer)};",
+                Return ret => $"return {GetExpression(ret.Expr)};",
+                Print print => $"{PrintFunctionFormat.Replace("$V", print.Variable.VariableName)};",
+                _ => throw new ArgumentOutOfRangeException(nameof(statement))
+            };
 
         protected virtual IEnumerable<string> GetFunctionDeclarationLines(FunctionDeclaration fun)
         {
@@ -106,7 +92,7 @@ namespace CompilerBenchmarker
         public abstract IEnumerable<string> GetProgramLines(Program program);
     }
 
-    class CSharpLang : BaseImperativeLang
+    class CSharpLang : BaseCStyleLang
     {
         public override string Extension => "cs";
         protected override string PrintFunctionFormat => "Console.WriteLine($V)";
@@ -129,7 +115,7 @@ namespace CompilerBenchmarker
         }
     }
 
-    class JavaLang : BaseImperativeLang
+    class JavaLang : BaseCStyleLang
     {
         public override string Extension => "java";
         protected override string PrintFunctionFormat => "System.out.println($V)";
@@ -148,7 +134,7 @@ namespace CompilerBenchmarker
         }
     }
 
-    class CLang : BaseImperativeLang
+    class CLang : BaseCStyleLang
     {
         public override string Extension => "c";
         protected override string PrintFunctionFormat => @"printf(""%i\n"", $V)";
@@ -165,7 +151,7 @@ namespace CompilerBenchmarker
         }
     }
 
-    class CppLang : BaseImperativeLang
+    class CppLang : BaseCStyleLang
     {
         public override string Extension => "cpp";
         protected override string PrintFunctionFormat => "std::cout << $V << std::endl";
@@ -182,7 +168,7 @@ namespace CompilerBenchmarker
         }
     }
 
-    class DLang : BaseImperativeLang
+    class DLang : BaseCStyleLang
     {
         public override string Extension => "d";
         protected override string PrintFunctionFormat => "writeln($V)";
@@ -199,7 +185,9 @@ namespace CompilerBenchmarker
         }
     }
 
-
+    /// <summary>
+    /// Base for languages with no semicolon ending or whitespace-indentation semantics such as F# and Haskell
+    /// </summary>
     abstract class BaseOtherLang : ILang
     {
         public abstract string Extension { get; }
@@ -218,59 +206,42 @@ namespace CompilerBenchmarker
         protected virtual string FunctionTypeIndicator => ": ";
         protected virtual string P => "p";
 
-        protected virtual string GetBinaryOperator(BinaryOperator op)
-        {
-            switch (op)
+        protected virtual string GetBinaryOperator(BinaryOperator op) =>
+            op switch
             {
-                case BinaryOperator.BitAnd: return "&";
-                case BinaryOperator.Minus: return "-";
-                case BinaryOperator.Multiply: return "*";
-                case BinaryOperator.BitOr: return "|";
-                case BinaryOperator.Plus: return "+";
-                case BinaryOperator.Xor: return "^";
-                default: throw new ArgumentOutOfRangeException(nameof(op));
-            }
-        }
+                BinaryOperator.BitAnd => "&",
+                BinaryOperator.Minus => "-",
+                BinaryOperator.Multiply => "*",
+                BinaryOperator.BitOr => "|",
+                BinaryOperator.Plus => "+",
+                BinaryOperator.Xor => "^",
+                _ => throw new ArgumentOutOfRangeException(nameof(op))
+            };
 
-        protected virtual string GetExpression(IExpr expr)
-        {
-            switch (expr)
+        protected virtual string GetExpression(IExpr expr) =>
+            expr switch
             {
-                case Literal literal: return literal.Text;
-                case Variable variable: return variable.VariableName;
-                case FunctionCall functionCall:
-                    var s = ML ? " " : "";
-                    return $"{functionCall.FunctionName}{s}({GetExpression(functionCall.Argument)})";
-                case BinaryOperation binOp:
-                    var left = GetExpression(binOp.LeftOperand);
-                    var right = GetExpression(binOp.RightOperand);
-                    return $"({left} {GetBinaryOperator(binOp.Operator)} {right})";
-                default: throw new ArgumentOutOfRangeException(nameof(expr));
-            }
-        }
+                Literal literal => literal.Text,
+                Variable variable => variable.VariableName,
+                FunctionCall functionCall =>
+                    $"{functionCall.FunctionName}{(ML ? " " : "")}({GetExpression(functionCall.Argument)})",
+                BinaryOperation binOp =>
+                    $"({GetExpression(binOp.LeftOperand)} {GetBinaryOperator(binOp.Operator)} {GetExpression(binOp.RightOperand)})",
+                _ => throw new ArgumentOutOfRangeException(nameof(expr))
+            };
 
-        protected virtual string GetStatement(IStatement statement, HashSet<Variable> assignedTo)
-        {
-            switch (statement)
+        protected virtual string GetStatement(IStatement statement, HashSet<Variable> assignedTo) =>
+            statement switch
             {
-                case Assignment assignment:
-                    var aname = assignment.Variable.VariableName;
-                    var aexpr = GetExpression(assignment.AssignedExpression);
-                    return $"{aname} {AssignmentOperator} {aexpr}";
-                case VariableDeclaration variableDeclaration:
-                    var vname = variableDeclaration.Variable.VariableName;
-                    var vexpr = GetExpression(variableDeclaration.Initializer);
-                    return assignedTo.Contains(variableDeclaration.Variable)
-                        ? $"{MutableDeclaration}{vname}{VariableTypeIndicator}{IntType} = {vexpr}"
-                        : $"{ImmutableDeclaration}{vname}{VariableTypeIndicator}{IntType} = {vexpr}";
-                case Return ret:
-                    return GetExpression(ret.Expr);
-                case Print print:
-                    var pvname = print.Variable.VariableName;
-                    return PrintFunctionFormat.Replace("$V", pvname);
-                default: throw new ArgumentOutOfRangeException(nameof(statement));
-            }
-        }
+                Assignment assignment =>
+                    $"{assignment.Variable.VariableName} {AssignmentOperator} {GetExpression(assignment.AssignedExpression)}",
+                VariableDeclaration variableDeclaration => assignedTo.Contains(variableDeclaration.Variable)
+                    ? $"{MutableDeclaration}{variableDeclaration.Variable.VariableName}{VariableTypeIndicator}{IntType} = {GetExpression(variableDeclaration.Initializer)}"
+                    : $"{ImmutableDeclaration}{variableDeclaration.Variable.VariableName}{VariableTypeIndicator}{IntType} = {GetExpression(variableDeclaration.Initializer)}",
+                Return ret => GetExpression(ret.Expr),
+                Print print => PrintFunctionFormat.Replace("$V", print.Variable.VariableName),
+                _ => throw new ArgumentOutOfRangeException(nameof(statement))
+            };
 
         protected virtual IEnumerable<string> GetFunctionDeclarationLines(FunctionDeclaration fun)
         {
@@ -289,6 +260,7 @@ namespace CompilerBenchmarker
 
                 yield return $"{IndentSpaces}{GetStatement(statement, assignedTo)}";
             }
+
             if (!string.IsNullOrEmpty(FunctionWrapEnd))
                 yield return FunctionWrapEnd;
         }
@@ -324,23 +296,14 @@ namespace CompilerBenchmarker
         protected override string FunctionTypeIndicator => " ";
         protected override string VariableTypeIndicator => " ";
 
-        protected override string GetStatement(IStatement statement, HashSet<Variable> assignedTo)
-        {
-            if (statement is VariableDeclaration variableDeclaration)
+        protected override string GetStatement(IStatement statement, HashSet<Variable> assignedTo) =>
+            statement switch
             {
-                var vname = variableDeclaration.Variable.VariableName;
-                var vexpr = GetExpression(variableDeclaration.Initializer);
-                return $"var {vname} {IntType} = {vexpr}";
-            }
-            else if (statement is Return ret)
-            {
-                return $"return {GetExpression(ret.Expr)}";
-            }
-            else
-            {
-                return base.GetStatement(statement, assignedTo);
-            }
-        }
+                VariableDeclaration variableDeclaration =>
+                    $"var {variableDeclaration.Variable.VariableName} {IntType} = {GetExpression(variableDeclaration.Initializer)}",
+                Return ret => $"return {GetExpression(ret.Expr)}",
+                _ => base.GetStatement(statement, assignedTo)
+            };
 
         public override IEnumerable<string> GetProgramLines(Program program)
         {
@@ -387,26 +350,22 @@ namespace CompilerBenchmarker
         protected override string ImmutableDeclaration => "val ";
         protected override bool ML => false;
 
-        protected override string GetBinaryOperator(BinaryOperator op)
-        {
-            switch (op)
+        protected override string GetBinaryOperator(BinaryOperator op) =>
+            op switch
             {
-                case BinaryOperator.BitAnd: return "and";
-                case BinaryOperator.Minus: return "-";
-                case BinaryOperator.Multiply: return "*";
-                case BinaryOperator.BitOr: return "or";
-                case BinaryOperator.Plus: return "+";
-                case BinaryOperator.Xor: return "xor";
-                default: throw new ArgumentOutOfRangeException(nameof(op));
-            }
-        }
+                BinaryOperator.BitAnd => "and",
+                BinaryOperator.Minus => "-",
+                BinaryOperator.Multiply => "*",
+                BinaryOperator.BitOr => "or",
+                BinaryOperator.Plus => "+",
+                BinaryOperator.Xor => "xor",
+                _ => throw new ArgumentOutOfRangeException(nameof(op))
+            };
 
-        protected override string GetStatement(IStatement statement, HashSet<Variable> assignedTo)
-        {
-            return (statement is Return ret)
+        protected override string GetStatement(IStatement statement, HashSet<Variable> assignedTo) =>
+            (statement is Return ret)
                 ? $"return {GetExpression(ret.Expr)}"
                 : base.GetStatement(statement, assignedTo);
-        }
 
         public override IEnumerable<string> GetProgramLines(Program program)
         {
@@ -424,7 +383,9 @@ namespace CompilerBenchmarker
         protected override string Main => "let main ()";
         protected override string PrintFunctionFormat => @"Printf.printf ""%i\n"" $V;;";
         protected override string FunctionPrefix => "let";
+
         protected override string AssignmentOperator => "=";
+
         // choosing to ignore OCaml mutable ref for simplicity
         protected override string MutableDeclaration => "let ";
         protected override string ImmutableDeclaration => "let ";
@@ -432,36 +393,28 @@ namespace CompilerBenchmarker
         protected override string FunctionWrapStart => "=";
         protected override string FunctionWrapEnd => "";
 
-        protected override string GetBinaryOperator(BinaryOperator op)
-        {
-            switch (op)
+        protected override string GetBinaryOperator(BinaryOperator op) =>
+            op switch
             {
-                case BinaryOperator.BitAnd: return "land";
-                case BinaryOperator.Minus: return "-";
-                case BinaryOperator.Multiply: return "*";
-                case BinaryOperator.BitOr: return "lor";
-                case BinaryOperator.Plus: return "+";
-                case BinaryOperator.Xor: return "lxor";
-                default: throw new ArgumentOutOfRangeException(nameof(op));
-            }
-        }
+                BinaryOperator.BitAnd => "land",
+                BinaryOperator.Minus => "-",
+                BinaryOperator.Multiply => "*",
+                BinaryOperator.BitOr => "lor",
+                BinaryOperator.Plus => "+",
+                BinaryOperator.Xor => "lxor",
+                _ => throw new ArgumentOutOfRangeException(nameof(op))
+            };
 
-        protected override string GetStatement(IStatement statement, HashSet<Variable> assignedTo)
-        {
-            // handle "let <expr> in"
-            if (statement is Print print)
-                return PrintFunctionFormat.Replace("$V", GetExpression(print.Variable));
-            else if (statement is Return ret)
-                return GetExpression(ret.Expr);
-            else if (statement is Assignment assignment)
+        protected override string GetStatement(IStatement statement, HashSet<Variable> assignedTo) =>
+            statement switch
             {
-                var aname = assignment.Variable.VariableName;
-                var aexpr = GetExpression(assignment.AssignedExpression);
-                return $"let {aname} {AssignmentOperator} {aexpr} in";
-            }
-            else
-                return base.GetStatement(statement, assignedTo) + " in";
-        }
+                // handle "let <expr> in"
+                Print print => PrintFunctionFormat.Replace("$V", GetExpression(print.Variable)),
+                Return ret => GetExpression(ret.Expr),
+                Assignment assignment =>
+                    $"let {assignment.Variable.VariableName} {AssignmentOperator} {GetExpression(assignment.AssignedExpression)} in",
+                _ => base.GetStatement(statement, assignedTo) + " in"
+            };
 
         public override IEnumerable<string> GetProgramLines(Program program)
         {
@@ -486,19 +439,17 @@ namespace CompilerBenchmarker
         protected override string FunctionWrapStart => "=";
         protected override string FunctionWrapEnd => "";
 
-        protected override string GetBinaryOperator(BinaryOperator op)
-        {
-            switch (op)
+        protected override string GetBinaryOperator(BinaryOperator op) =>
+            op switch
             {
-                case BinaryOperator.BitAnd: return "&&&";
-                case BinaryOperator.Minus: return "-";
-                case BinaryOperator.Multiply: return "*";
-                case BinaryOperator.BitOr: return "|||";
-                case BinaryOperator.Plus: return "+";
-                case BinaryOperator.Xor: return "^^^";
-                default: throw new ArgumentOutOfRangeException(nameof(op));
-            }
-        }
+                BinaryOperator.BitAnd => "&&&",
+                BinaryOperator.Minus => "-",
+                BinaryOperator.Multiply => "*",
+                BinaryOperator.BitOr => "|||",
+                BinaryOperator.Plus => "+",
+                BinaryOperator.Xor => "^^^",
+                _ => throw new ArgumentOutOfRangeException(nameof(op))
+            };
 
         public override IEnumerable<string> GetProgramLines(Program program)
         {
@@ -515,7 +466,9 @@ namespace CompilerBenchmarker
         protected override string Main => "main :: IO ()\nmain ";
         protected override string PrintFunctionFormat => @"printf ""%i\n"" $V";
         protected override string FunctionPrefix => "";
+
         protected override string AssignmentOperator => "=";
+
         // choose to ignore Haskell's Data.IORef for simplicity
         protected override string MutableDeclaration => "let ";
         protected override string ImmutableDeclaration => "let ";
@@ -523,39 +476,29 @@ namespace CompilerBenchmarker
         protected override string FunctionWrapStart => "=";
         protected override string FunctionWrapEnd => "";
 
-        protected override string GetBinaryOperator(BinaryOperator op)
-        {
-            switch (op)
+        protected override string GetBinaryOperator(BinaryOperator op) =>
+            op switch
             {
-                case BinaryOperator.BitAnd: return "&&&";
-                case BinaryOperator.Minus: return "-";
-                case BinaryOperator.Multiply: return "*";
-                case BinaryOperator.BitOr: return "|||";
-                case BinaryOperator.Plus: return "+";
-                case BinaryOperator.Xor: return "^^^";
-                default: throw new ArgumentOutOfRangeException(nameof(op));
-            }
-        }
+                BinaryOperator.BitAnd => "&&&",
+                BinaryOperator.Minus => "-",
+                BinaryOperator.Multiply => "*",
+                BinaryOperator.BitOr => "|||",
+                BinaryOperator.Plus => "+",
+                BinaryOperator.Xor => "^^^",
+                _ => throw new ArgumentOutOfRangeException(nameof(op))
+            };
 
-        protected override string GetStatement(IStatement statement, HashSet<Variable> assignedTo)
-        {
-            switch (statement)
+        protected override string GetStatement(IStatement statement, HashSet<Variable> assignedTo) =>
+            statement switch
             {
-                case Assignment assignment:
-                    var aname = assignment.Variable.VariableName;
-                    var aexpr = GetExpression(assignment.AssignedExpression);
-                    return $"let {aname} {AssignmentOperator} {aexpr} in";
-                case VariableDeclaration variableDeclaration:
-                    var vname = variableDeclaration.Variable.VariableName;
-                    var vexpr = GetExpression(variableDeclaration.Initializer);
-                    return $"{ImmutableDeclaration}({vname} :: {IntType}) {AssignmentOperator} {vexpr} in";
-                case Return ret:
-                    return GetExpression(ret.Expr);
-                case Print print:
-                    return PrintFunctionFormat.Replace("$V", print.Variable.VariableName);
-                default: throw new ArgumentOutOfRangeException(nameof(statement));
-            }
-        }
+                Assignment assignment =>
+                    $"let {assignment.Variable.VariableName} {AssignmentOperator} {GetExpression(assignment.AssignedExpression)} in",
+                VariableDeclaration variableDeclaration =>
+                    $"{ImmutableDeclaration}({variableDeclaration.Variable.VariableName} :: {IntType}) {AssignmentOperator} {GetExpression(variableDeclaration.Initializer)} in",
+                Return ret => GetExpression(ret.Expr),
+                Print print => PrintFunctionFormat.Replace("$V", print.Variable.VariableName),
+                _ => throw new ArgumentOutOfRangeException(nameof(statement))
+            };
 
         protected override IEnumerable<string> GetFunctionDeclarationLines(FunctionDeclaration fun)
         {
@@ -600,7 +543,7 @@ namespace CompilerBenchmarker
     class RustLang : BaseOtherLang
     {
         public override string Extension => "rs";
-        protected override string IntType => "i32";
+        protected override string IntType => "w32";
         protected override string Main => "fn main()";
         protected override string PrintFunctionFormat => @"println!(""{}"", $V)";
         protected override string FunctionPrefix => "fn";
@@ -611,17 +554,14 @@ namespace CompilerBenchmarker
         protected override bool ML => false;
 
         protected override string GetStatement(
-            IStatement statement, HashSet<Variable> assignedTo)
-        {
-            if (statement is Return ret)
-                return GetExpression(ret.Expr);
-            else
-                return base.GetStatement(statement, assignedTo) + ";";
-        }
+            IStatement statement, HashSet<Variable> assignedTo) =>
+            statement is Return ret ? GetExpression(ret.Expr) : base.GetStatement(statement, assignedTo) + ";";
 
         public override IEnumerable<string> GetProgramLines(Program program)
         {
             yield return "#![allow(unused_parens)]\n";
+            yield return "use std::num::Wrapping<i32>;\n";
+            yield return "type w32 = std::num::Wrapping<i32>;\n";
 
             foreach (var line in GetProgramCoreLines(program))
                 yield return line;
@@ -641,22 +581,16 @@ namespace CompilerBenchmarker
         protected override string FunctionTypeIndicator => " -> ";
         protected override bool ML => false;
 
-        protected override string GetExpression(IExpr expr)
-        {
-            if (expr is FunctionCall functionCall)
-                return $"{functionCall.FunctionName}({P}: {GetExpression(functionCall.Argument)})";
-            else
-                return base.GetExpression(expr);
-        }
+        protected override string GetExpression(IExpr expr) =>
+            expr is FunctionCall functionCall
+                ? $"{functionCall.FunctionName}({P}: {GetExpression(functionCall.Argument)})"
+                : base.GetExpression(expr);
 
         protected override string GetStatement(
-            IStatement statement, HashSet<Variable> assignedTo)
-        {
-            if (statement is Return ret)
-                return $"return {GetExpression(ret.Expr)}";
-            else
-                return base.GetStatement(statement, assignedTo);
-        }
+            IStatement statement, HashSet<Variable> assignedTo) =>
+            statement is Return ret
+                ? $"return {GetExpression(ret.Expr)}"
+                : base.GetStatement(statement, assignedTo);
 
         public override IEnumerable<string> GetProgramLines(Program program)
         {
@@ -681,19 +615,17 @@ namespace CompilerBenchmarker
         protected override string FunctionWrapEnd => "";
         protected override bool ML => false;
 
-        protected override string GetBinaryOperator(BinaryOperator op)
-        {
-            switch (op)
+        protected override string GetBinaryOperator(BinaryOperator op) =>
+            op switch
             {
-                case BinaryOperator.BitAnd: return "and";
-                case BinaryOperator.Minus: return "-";
-                case BinaryOperator.Multiply: return "*";
-                case BinaryOperator.BitOr: return "or";
-                case BinaryOperator.Plus: return "+";
-                case BinaryOperator.Xor: return "xor";
-                default: throw new ArgumentOutOfRangeException(nameof(op));
-            }
-        }
+                BinaryOperator.BitAnd => "and",
+                BinaryOperator.Minus => "-",
+                BinaryOperator.Multiply => "*",
+                BinaryOperator.BitOr => "or",
+                BinaryOperator.Plus => "+",
+                BinaryOperator.Xor => "xor",
+                _ => throw new ArgumentOutOfRangeException(nameof(op))
+            };
 
         public override IEnumerable<string> GetProgramLines(Program program)
         {
@@ -726,52 +658,6 @@ namespace CompilerBenchmarker
                 yield return line;
             yield return "";
             yield return "main()";
-        }
-    }
-
-    public class CodeGen
-    {
-        // Ensure deterministic program creation
-        // So every program made with instance/numFuns follows the same formula
-        int _seed { get; } = Convert.ToInt32(new Random().NextDouble() * 100000);
-
-        ILang GetLang(string lang)
-        {
-            switch (lang.ToLower())
-            {
-                case "c++": return new CppLang();
-                case "c": return new CLang();
-                case "d": return new DLang();
-                case "go": return new GoLang();
-                case "rust": return new RustLang();
-                case "ocaml": return new OCamlLang();
-                case "fsharp": return new FSharpLang();
-                case "csharp": return new CSharpLang();
-                case "haskell": return new HaskellLang();
-                case "kotlin": return new KotlinLang();
-                case "java": return new JavaLang();
-                case "scala": return new ScalaLang();
-                case "swift": return new SwiftLang();
-                case "nim": return new NimLang();
-                case "crystal": return new CrystalLang();
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(lang),
-                        $"{lang} is not supported by the code generation. So code it up!");
-            }
-        }
-
-        public void WriteLang(string langname, int numFuns, string filename)
-        {
-            var lang = GetLang(langname);
-            if (File.Exists(filename))
-                File.Delete(filename);
-
-            var program = ProgramGenerator.RandomProgram(new Random(_seed), numFuns, 10);
-            using (var f = new StreamWriter(filename))
-            {
-                foreach (var line in lang.GetProgramLines(program))
-                    f.WriteLine(line);
-            }
         }
     }
 }

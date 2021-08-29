@@ -1,29 +1,24 @@
-
-using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Text;
 
 namespace CompilerBenchmarker
 {
     class BasicSystemInfo
     {
-        private static string WaitAndRead(string exe, string args)
+        static string WaitAndRead(string exe, string args)
         {
-            using (var p = new Process())
-            {
-                p.StartInfo.FileName = exe;
-                p.StartInfo.Arguments = args;
-                p.StartInfo.UseShellExecute = false;
-                p.StartInfo.RedirectStandardOutput = true;
-                p.StartInfo.RedirectStandardError = true;
-                p.Start();
+            using var p = new Process();
+            p.StartInfo.FileName = exe;
+            p.StartInfo.Arguments = args;
+            p.StartInfo.UseShellExecute = false;
+            p.StartInfo.RedirectStandardOutput = true;
+            p.StartInfo.RedirectStandardError = true;
+            p.Start();
 
-                var sout = p.StandardOutput.ReadToEnd();
-                return string.IsNullOrWhiteSpace(sout)
-                    ? $"No standard output found for `{exe} {args}`"
-                    : sout;
-            }
+            var sout = p.StandardOutput.ReadToEnd();
+            return string.IsNullOrWhiteSpace(sout)
+                ? $"No standard output found for `{exe} {args}`"
+                : sout;
         }
 
         public static BasicSystemInfo Find()
@@ -75,10 +70,12 @@ namespace CompilerBenchmarker
             };
         }
 
-        private BasicSystemInfo() {}
+        BasicSystemInfo()
+        {
+        }
 
-        public string OS {get;set;}
-        public string CPU {get;set;}
-        public string Memory {get;set;}
+        public string OS { get; private init; }
+        public string CPU { get; private init; }
+        public string Memory { get; private init; }
     }
 }
