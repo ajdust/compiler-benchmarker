@@ -29,7 +29,7 @@ namespace CompilerBenchmarker
 
         public static List<T> ReadAllCsv<T>(this FileInfo file)
         {
-            using var reader = new StreamReader("path\\to\\file.csv");
+            using var reader = new StreamReader(file.FullName);
             using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
             return csv.GetRecords<T>().ToList();
         }

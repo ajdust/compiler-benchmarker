@@ -7,13 +7,14 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Tasks;
 using CsvHelper;
 
 namespace CompilerBenchmarker
 {
     static class Benchmarker
     {
-        static TimingResult? CmdTimeBenchmark(CompilerInfo compiler, TestCase testCase, string args)
+        static async Task<TimingResult> TimeBenchmarkAsync(CompilerInfo compiler, TestCase testCase, string args)
         {
             var sout = new List<string>();
             using (var p = new Process())
@@ -49,12 +50,27 @@ namespace CompilerBenchmarker
                 p.Start();
                 p.BeginOutputReadLine();
                 p.BeginErrorReadLine();
-                p.WaitForExit();
+
+                var cts = new CancellationTokenSource();
+                cts.CancelAfter(180_000);
+                try
+                {
+                    await p.WaitForExitAsync(cts.Token);
+                    // See https://www.meziantou.net/process-waitforexitasync-doesn-t-behave-like-process-waitforexit.htm
+                    // ReSharper disable once MethodHasAsyncOverloadWithCancellation
+                    p.WaitForExit();
+                }
+                catch (TaskCanceledException)
+                {
+                    sout.Add("[Cancelled after 180 second time out]");
+                    p?.Kill();
+                }
 
                 if (p.ExitCode != 0)
                 {
                     Thread.Sleep(2500);
-                    return null;
+                    return new TimingResult(0, 0, 
+                        $"{p.ExitCode} {sout.Join(";").Replace("\n", "|")}");
                 }
             }
 
@@ -70,27 +86,28 @@ namespace CompilerBenchmarker
                 {
                     Console.WriteLine($"  ! Compilation failed for '{compiler.Compiler} {args}'");
                     Thread.Sleep(2500);
-                    return null;
+                    return new TimingResult(0, 0, 
+                        $"{exitCode} {sout.Join(";").Replace("\n", "|")}");
                 }
 
                 var elapsedSeconds = double.Parse(results[2]);
                 var maxResidentSetSize = int.Parse(results[3]);
                 var timing = new TimingResult(elapsedSeconds, maxResidentSetSize);
-                Console.WriteLine($"  - Took {timing.Elapsed} MRSS {maxResidentSetSize}");
+                Console.WriteLine($"  - Took {timing.ElapsedSeconds} MRSS {maxResidentSetSize}");
                 return timing;
             }
 
             throw new Exception("Result of /usr/bin/time not found in output of {" + string.Join("\n", sout) + "}");
         }
 
-        static TimingResult? RunBenchmark(CompilerInfo compiler, TestCase testCase, string codeFilePath, int numFun)
+        static async Task<TimingResult> RunBenchmarkAsync(CompilerInfo compiler, TestCase testCase, string codeFilePath, int numFun)
         {
             // dotnet cli requires project file
             var isDotnet = compiler.Compiler == "dotnet";
             if (isDotnet)
             {
                 using var p = Process.Start(compiler.Compiler, $"restore CB.{compiler.Extension}proj");
-                p.WaitForExit();
+                await p.WaitForExitAsync();
                 if (p.ExitCode != 0)
                 {
                     Console.WriteLine($"  ! Compilation failed for '{compiler.Compiler}'");
@@ -103,10 +120,10 @@ namespace CompilerBenchmarker
                 : $"{testCase.Arguments} {codeFilePath}";
 
             Console.Write($"  - Running with {numFun}: ");
-            return CmdTimeBenchmark(compiler, testCase, args);
+            return await TimeBenchmarkAsync(compiler, testCase, args);
         }
 
-        static IEnumerable<TestCase> RunBenchmarks(
+        static async IAsyncEnumerable<TestCase> RunBenchmarks(
             List<CompilerInfo> compilers, List<TestCase> testCases)
         {
             // Which files to not delete after compiling
@@ -118,13 +135,13 @@ namespace CompilerBenchmarker
 
             var failed = new HashSet<CompilerInfo>();
             var requireDotnetProjFile = testCases.Any(x => x.Compiler == "dotnet");
-            var byCompiler = compilers.ToDictionary(x => x.Compiler);
+            var byCompiler = compilers.ToDictionary(x => (x.Compiler, x.Language));
 
             foreach (var testCase in testCases)
             {
                 Console.WriteLine($"Benchmarking {testCase}:");
 
-                var compiler = byCompiler[testCase.Compiler];
+                var compiler = byCompiler[(testCase.Compiler, testCase.Language)];
                 var codeFilePath = $"test_{testCase.NumberFunctions}.{compiler.Extension}";
 
                 // Sub test directory
@@ -158,17 +175,17 @@ namespace CompilerBenchmarker
                         continue;
                     }
 
-                    var bench = RunBenchmark(compiler, testCase, codeFilePath, testCase.NumberFunctions);
-                    if (!bench.HasValue)
+                    var (elapsedSeconds, maxResidentSetSizeKb, error) = await RunBenchmarkAsync(compiler, testCase, codeFilePath, testCase.NumberFunctions);
+                    if (error is not null)
                         failed.Add(compiler);
 
-                    yield return bench.HasValue
+                    yield return error is null
                         ? testCase with
                         {
-                            TimeSeconds = bench.Value.Elapsed.TotalSeconds,
-                            MemoryKB = bench.Value.MaxResidentSetSizeKilobytes
+                            TimeSeconds = elapsedSeconds,
+                            MemoryKB = maxResidentSetSizeKb
                         }
-                        : testCase with { Error = "Failed" };
+                        : testCase with { Error = error };
 
                     // Cleanup temporary files left by compiler
                     foreach (var file in new DirectoryInfo(Directory.GetCurrentDirectory())
@@ -183,7 +200,7 @@ namespace CompilerBenchmarker
             }
         }
 
-        static void StartBench(List<CompilerInfo> compilers, List<TestCase> testCases)
+        static async Task StartBenchAsync(List<CompilerInfo> compilers, List<TestCase> testCases, string outpath)
         {
             // Create and step into 'testfiles' directory
             var writeTo = $"./testfiles";
@@ -191,33 +208,24 @@ namespace CompilerBenchmarker
                 Directory.CreateDirectory(writeTo);
             Directory.SetCurrentDirectory(writeTo);
 
-            var now = DateTime.Now;
-
-            // Record system information if it's not there
-            var systemFilename = $"./{now:yyyyMMddHHmm}_system.txt";
-            if (!File.Exists(systemFilename))
-            {
-                var info = BasicSystemInfo.Find();
-                var infoText = new[] { info.OS, info.CPU, info.Memory }.Join("\n\n");
-                File.WriteAllText(systemFilename, infoText);
-            }
-
             // Collect benchmarks!
-            using var writer = new StreamWriter($"./{now:yyyyMMddHHmm}_results.csv");
-            using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
+            await using var writer = new StreamWriter(outpath);
+            await using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
             csv.WriteHeader<TestCase>();
 
             // Run
             var lazyBenchmarks = RunBenchmarks(compilers, testCases);
-            foreach (var b in lazyBenchmarks)
+            await foreach (var b in lazyBenchmarks)
             {
+                await csv.NextRecordAsync();
                 csv.WriteRecord(b);
+                await csv.FlushAsync();
             }
         }
 
         record CompilerInfo(string Language, string Extension, string Compiler, string VersionArgument)
         {
-            public string CheckCompilerAndSetVersion()
+            public CompilerInfo GetVersion()
             {
                 using var p = new Process();
                 p.StartInfo.FileName = Compiler;
@@ -229,18 +237,11 @@ namespace CompilerBenchmarker
                 var sout = p.StandardOutput.ReadToEnd();
                 var serr = p.StandardError.ReadToEnd();
                 var o = string.IsNullOrWhiteSpace(sout) ? serr : sout;
-                if (o == null)
-                    return "";
-
                 var line = o
                     .Split('\n')
                     .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))?.Trim();
-                if (line == null)
-                    return "";
 
-                var r = new System.Text.RegularExpressions.Regex(@"(v?\d[\d\w.-]+)");
-                var m = r.Match(line);
-                return line;
+                return this with { VersionArgument = line };
             }
         }
 
@@ -251,20 +252,45 @@ namespace CompilerBenchmarker
         {
             public Dictionary<string, string> EnvironmentVariables =>
                 !string.IsNullOrWhiteSpace(Environment)
-                    ? JsonSerializer.Deserialize<Dictionary<string, string>>(Environment) : new();
+                    ? Environment.Split(';').ToDictionary(x => x.Split(':')[0], x => x.Split(':')[1]) : new();
         }
 
-        static void Main()
+        record TimingResult(double ElapsedSeconds, double MaxResidentSetSizeKb, string Error = null);
+        
+        static async Task Main()
         {
+            var now = DateTime.Now;
             var compilerPath = "./compilers.csv";
             var testCasesPath = "./empty.csv";
-
+            var systemOutPath = $"./{now:yyyyMMddHHmm}_system.txt";
+            var compilerOutPath = $"{now:yyyyMMddHHmm}_compilers.csv";
+            var testCasesOutPath = $"{now:yyyyMMddHHmm}_results.csv";
+            
             var compilers = new FileInfo(compilerPath).ReadAllCsv<CompilerInfo>();
+            Console.WriteLine($"Found {compilers.Count} compilers ({compilerOutPath})");
+            {
+                Console.WriteLine($"Recording compiler versions");
+                compilers = compilers.Select(x => x.GetVersion()).ToList();
+                using var writer = new StreamWriter(compilerOutPath);
+                using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
+                csv.WriteHeader<CompilerInfo>();
+                csv.WriteRecords(compilers);
+            }
+            
+            // Record system information if it's not there
+            if (!File.Exists(systemOutPath))
+            {
+                Console.WriteLine($"Getting system information ({systemOutPath})");
+                var info = BasicSystemInfo.Find();
+                var infoText = new[] { info.OS, info.CPU, info.Memory }.Join("\n\n");
+                File.WriteAllText(systemOutPath, infoText);
+            }
+            
             var testCases = new FileInfo(testCasesPath).ReadAllCsv<TestCase>();
 
             try
             {
-                StartBench(compilers, testCases);
+                await StartBenchAsync(compilers, testCases, testCasesOutPath);
             }
             catch (Exception e)
             {
