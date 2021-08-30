@@ -553,6 +553,9 @@ namespace CompilerBenchmarker.CodeGen
         protected override string FunctionTypeIndicator => " -> ";
         protected override bool ML => false;
 
+        protected override string GetExpression(IExpr expr) =>
+            expr is Literal l ? $"Wrapping({l.Text})" : base.GetExpression(expr);
+
         protected override string GetStatement(
             IStatement statement, HashSet<Variable> assignedTo) =>
             statement is Return ret ? GetExpression(ret.Expr) : base.GetStatement(statement, assignedTo) + ";";
@@ -560,7 +563,7 @@ namespace CompilerBenchmarker.CodeGen
         public override IEnumerable<string> GetProgramLines(Program program)
         {
             yield return "#![allow(unused_parens)]\n";
-            yield return "use std::num::Wrapping<i32>;\n";
+            yield return "use std::num::Wrapping;\n";
             yield return "type w32 = std::num::Wrapping<i32>;\n";
 
             foreach (var line in GetProgramCoreLines(program))
