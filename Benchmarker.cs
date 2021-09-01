@@ -59,7 +59,12 @@ namespace CompilerBenchmarker
                     // See https://www.meziantou.net/process-waitforexitasync-doesn-t-behave-like-process-waitforexit.htm
                     // ReSharper disable once MethodHasAsyncOverloadWithCancellation
                     p.WaitForExit();
-
+                    while (!p.HasExited)
+                    {
+                        cts.Token.ThrowIfCancellationRequested();
+                        await Task.Delay(250);
+                    }
+                    
                     if (p.ExitCode != 0)
                     {
                         Thread.Sleep(2500);
