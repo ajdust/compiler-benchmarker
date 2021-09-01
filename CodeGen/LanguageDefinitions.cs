@@ -543,7 +543,7 @@ namespace CompilerBenchmarker.CodeGen
     class RustLang : BaseOtherLang
     {
         public override string Extension => "rs";
-        protected override string IntType => "w32";
+        protected override string IntType => "W32";
         protected override string Main => "fn main()";
         protected override string PrintFunctionFormat => @"println!(""{}"", $V)";
         protected override string FunctionPrefix => "fn";
@@ -564,7 +564,7 @@ namespace CompilerBenchmarker.CodeGen
         {
             yield return "#![allow(unused_parens)]\n";
             yield return "use std::num::Wrapping;\n";
-            yield return "type w32 = std::num::Wrapping<i32>;\n";
+            yield return "type W32 = std::num::Wrapping<i32>;\n";
 
             foreach (var line in GetProgramCoreLines(program))
                 yield return line;
