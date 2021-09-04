@@ -9,6 +9,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using CsvHelper;
+using Polly;
 
 namespace CompilerBenchmarker
 {
@@ -59,17 +60,22 @@ namespace CompilerBenchmarker
                     // See https://www.meziantou.net/process-waitforexitasync-doesn-t-behave-like-process-waitforexit.htm
                     // ReSharper disable once MethodHasAsyncOverloadWithCancellation
                     p.WaitForExit();
+                    
+                    // Avoid "System.InvalidOperationException: Process must exit before requested information can be determined."
                     while (!p.HasExited)
                     {
                         cts.Token.ThrowIfCancellationRequested();
-                        await Task.Delay(250);
+                        await Task.Delay(250, cts.Token);
                     }
+                    var exitCode = Policy.Handle<InvalidOperationException>()
+                        .WaitAndRetry(10, (i) => TimeSpan.FromSeconds(i))
+                        .Execute(() => p.ExitCode);
                     
-                    if (p.ExitCode != 0)
+                    if (exitCode != 0)
                     {
                         Thread.Sleep(2500);
                         return new TimingResult(0, 0,
-                            $"{p.ExitCode} {sout.Join(";").Replace("\n", "|")}");
+                            $"{exitCode} {sout.Join(";").Replace("\n", "|")}");
                     }
                 }
                 catch (TaskCanceledException)
