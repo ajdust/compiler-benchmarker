@@ -286,10 +286,11 @@ namespace CompilerBenchmarker
             {
                 Console.WriteLine($"Recording compiler versions");
                 compilers = compilers.Select(x => x.GetVersion()).ToList();
-                using var writer = new StreamWriter(compilerOutPath);
-                using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
+                await using var writer = new StreamWriter(compilerOutPath);
+                await using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
                 csv.WriteHeader<CompilerInfo>();
-                csv.WriteRecords(compilers);
+                await csv.NextRecordAsync();
+                await csv.WriteRecordsAsync(compilers);
             }
 
             // Record system information if it's not there
@@ -298,7 +299,7 @@ namespace CompilerBenchmarker
                 Console.WriteLine($"Getting system information ({systemOutPath})");
                 var info = BasicSystemInfo.Find();
                 var infoText = new[] { info.OS, info.CPU, info.Memory }.Join("\n\n");
-                File.WriteAllText(systemOutPath, infoText);
+                await File.WriteAllTextAsync(systemOutPath, infoText);
             }
 
             var testCases = new FileInfo(testCasesPath).ReadAllCsv<TestCase>();

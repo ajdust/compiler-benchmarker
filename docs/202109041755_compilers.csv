@@ -1,0 +1,19 @@
+Language,Extension,Compiler,VersionArgument,
+C,c,gcc,gcc (Ubuntu 9.3.0-17ubuntu1~20.04) 9.3.0
+C,c,clang,clang version 10.0.0 (git@github.com:apple/llvm-project.git 8ee67e3af469eb38c9616f971abd5a47fe8d6405)
+C++,cpp,g++,g++ (Ubuntu 9.3.0-17ubuntu1~20.04) 9.3.0
+C++,cpp,clang++,clang version 10.0.0 (git@github.com:apple/llvm-project.git 8ee67e3af469eb38c9616f971abd5a47fe8d6405)
+D,d,dmd,DMD64 D Compiler v2.097.2
+D,d,gdc,gdc (Ubuntu 10.3.0-1ubuntu1~20.04) 10.3.0
+D,d,ldc2,LDC - the LLVM D compiler (1.20.1):
+Go,go,go,go version go1.17 linux/amd64
+Rust,rs,rustc,rustc 1.54.0 (a178d0322 2021-07-26)
+Swift,swift,swiftc,Swift version 5.4.2 (swift-5.4.2-RELEASE)
+OCaml,ml,ocamlopt,4.08.1
+Haskell,hs,stack,"The Glorious Glasgow Haskell Compilation System, version 8.10.6"
+Java,java,javac,javac 16.0.1
+Scala,scala,scalac,"Scala compiler version 3.0.1 -- Copyright 2002-2021, LAMP/EPFL"
+Kotlin,kt,kotlinc,info: kotlinc-jvm 1.5.30 (JRE 16.0.1+9-Ubuntu-120.04)
+CSharp,cs,dotnet,5.0.400
+FSharp,fs,dotnet,5.0.400
+Nim,nim,nim,Nim Compiler Version 1.4.8 [Linux: amd64]
