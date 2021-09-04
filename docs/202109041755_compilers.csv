@@ -1,4 +1,4 @@
-Language,Extension,Compiler,VersionArgument,
+Language,Extension,Compiler,VersionArgument
 C,c,gcc,gcc (Ubuntu 9.3.0-17ubuntu1~20.04) 9.3.0
 C,c,clang,clang version 10.0.0 (git@github.com:apple/llvm-project.git 8ee67e3af469eb38c9616f971abd5a47fe8d6405)
 C++,cpp,g++,g++ (Ubuntu 9.3.0-17ubuntu1~20.04) 9.3.0
